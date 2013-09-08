@@ -1,8 +1,12 @@
 TODO:
 
-- aggregate function velocity
+- improved scheduling of rollers
+    - a roller for minutes, is now allowed to overtake the roller of seconds.
+    - the scheduling mechanism is not distributed
+    - the scheduling mechanism is not able to deal with a restart
+    - the scheduling mechanism currently only deals with a single customer
 
-- the value currently needs to be a string
+- aggregate function velocity
 
 - failover; when a machine fails a different machines should take over the rollup.
 
@@ -11,11 +15,17 @@ TODO:
 - embedded cassandra
 http://wiki.apache.org/cassandra/Embedding
 
+DONE
+
+- pass the customer family to the repository functions
+
+- add function where the column families for a customer are made
+
 - customer isolation.
 
 - find the sensors for a given customer within a give time period.
 
-DONE
+- get rid of the datapointTemplate
 
 - expiring old data:
   http://www.datastax.com/dev/blog/whats-new-cassandra-07-expiring-columns

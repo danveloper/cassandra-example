@@ -17,6 +17,7 @@ import static org.junit.Assert.*;
 public class DatapointRepositoryTest {
 
     public  final String KEYSPACE = generateKeySpaceName();
+    String customer = "hazelcast";
 
     private String generateKeySpaceName() {
         return "Test_"+ UUID.randomUUID().toString().replace("-","");
@@ -30,6 +31,7 @@ public class DatapointRepositoryTest {
         cluster = HFactory.getOrCreateCluster("test-cluster", "localhost:9160");
         Keyspace keyspace = createKeyspace(cluster, KEYSPACE);
         repository = new DatapointRepository(cluster, keyspace, "peter",(int) TimeUnit.HOURS.toMillis(1));
+        repository.createColumnFamilies(customer);
     }
 
     @After
@@ -51,32 +53,32 @@ public class DatapointRepositoryTest {
     @Test
     public void readExisting() {
         long time = System.currentTimeMillis();
-        repository.update("foo", time, "1");
-        String result = repository.read("foo", time);
+        repository.update(customer,"foo", time, "1");
+        String result = repository.read(customer,"foo", time);
         assertEquals("1", result);
     }
 
     @Test
     public void readNonExisting() {
         long time = System.currentTimeMillis();
-        String result = repository.read("foo", time);
+        String result = repository.read(customer,"foo", time);
         assertNull(result);
     }
 
     @Test
     public void sensorNameIterator_noNames() {
         long time = System.currentTimeMillis();
-        Iterator it = repository.sensorNameIterator(time, time);
+        Iterator it = repository.sensorNameIterator(customer,time, time);
         assertFalse(it.hasNext());
     }
 
     @Test
     public void sensorNameIterator_multipleNames() {
         long time = System.currentTimeMillis();
-        repository.update("foo", time, "1");
-        repository.update("bar", time, "1");
+        repository.update(customer,"foo", time, "1");
+        repository.update(customer,"bar", time, "1");
 
-        Set<String> names = toSet(repository.sensorNameIterator(time, time));
+        Set<String> names = toSet(repository.sensorNameIterator(customer,time, time));
         assertEquals(2, names.size());
         assertTrue(names.contains("foo"));
         assertTrue(names.contains("bar"));

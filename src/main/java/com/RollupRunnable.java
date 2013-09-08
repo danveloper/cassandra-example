@@ -23,15 +23,17 @@ public class RollupRunnable implements Runnable {
     private final String description;
     private final AggregateFunctionFactory functionFactory;
     private final ExecutorService executorService;
+    private final String customer;
     private long startMs = System.currentTimeMillis();
 
     public RollupRunnable(DatapointRepository source, DatapointRepository target, String description,
-                          AggregateFunctionFactory functionFactory, ExecutorService executorService) {
+                          AggregateFunctionFactory functionFactory, ExecutorService executorService, String customer) {
         this.source = source;
         this.target = target;
         this.description = description;
         this.functionFactory = functionFactory;
         this.executorService = executorService;
+        this.customer = customer;
     }
 
     @Override
@@ -45,9 +47,9 @@ public class RollupRunnable implements Runnable {
         try {
 
             List<Future> futures = new LinkedList<Future>();
-            for (Iterator<String> it = source.sensorNameIterator(startMs, endMs); it.hasNext(); ) {
+            for (Iterator<String> it = source.sensorNameIterator(customer,startMs, endMs); it.hasNext(); ) {
                 String sensor = it.next();
-                Future<?> future = executorService.submit(new ProcessRunnable(sensor, startMs, endMs));
+                Future<?> future = executorService.submit(new ProcessRunnable(customer, sensor, startMs, endMs));
                 futures.add(future);
             }
 
@@ -71,11 +73,13 @@ public class RollupRunnable implements Runnable {
         private final String sensor;
         private final long startMs;
         private final long endMs;
+        private final String customer;
 
-        private ProcessRunnable(String sensor, long startMs, long endMs) {
+        private ProcessRunnable(String customer, String sensor, long startMs, long endMs) {
             this.sensor = sensor;
             this.startMs = startMs;
             this.endMs = endMs;
+            this.customer  = customer;
         }
 
         @Override
@@ -84,7 +88,7 @@ public class RollupRunnable implements Runnable {
                 AggregateFunction function = functionFactory.newAggregateFunction();
                 function.setPeriod(this.startMs, endMs);
 
-                ColumnSliceIterator<String, UUID, String> iterator = source.dataPointIterator(sensor, startMs, endMs);
+                ColumnSliceIterator<String, UUID, String> iterator = source.dataPointIterator(customer,sensor, startMs, endMs);
 
                 for (; iterator.hasNext(); ) {
                     HColumn<UUID, String> columns = iterator.next();
@@ -92,7 +96,7 @@ public class RollupRunnable implements Runnable {
                     function.feed(value);
                 }
 
-                target.update(sensor, startMs, "" + function.result());
+                target.update(customer,sensor, startMs, "" + function.result());
             } catch (Throwable e) {
                 logger.warn("Failed to compact", e);
             }

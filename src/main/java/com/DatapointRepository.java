@@ -30,41 +30,15 @@ public class DatapointRepository {
     private final Keyspace keyspace;
     private final Cluster cluster;
 
-    private final ColumnFamilyDefinition datapointColumnFamily;
-    private final ThriftColumnFamilyTemplate<String, UUID> datapointTemplate;
-
-    private final ColumnFamilyDefinition sensornameColumnFamily;
     private final int ttlMs;
+    private final String name;
 
     public DatapointRepository(Cluster cluster, Keyspace Keyspace, String name, int ttlMs) {
-        name = name.toLowerCase();
+        this.name = name.toLowerCase();
         this.cluster = cluster;
         this.keyspace = Keyspace;
         this.ttlMs = ttlMs;
-
-        // ================= datapoints ================================
-
-        this.datapointColumnFamily = HFactory.createColumnFamilyDefinition(
-                keyspace.getKeyspaceName(), name, ComparatorType.UUIDTYPE);
-
-        addIfNotExist(cluster, keyspace, datapointColumnFamily);
-
-        this.datapointTemplate = new ThriftColumnFamilyTemplate<String, UUID>(
-                Keyspace,
-                datapointColumnFamily.getName(),
-                StringSerializer.get(),
-                TimeUUIDSerializer.get());
-
-        // =================== sensor names =============================
-
-        sensornameColumnFamily = HFactory.createColumnFamilyDefinition(
-                keyspace.getKeyspaceName(), name + "_names", ComparatorType.COMPOSITETYPE);
-        sensornameColumnFamily.setComparatorTypeAlias("(TimeUUIDType, UTF8Type)");
-        sensornameColumnFamily.setKeyValidationClass("UTF8Type");
-        sensornameColumnFamily.setDefaultValidationClass("UTF8Type");
-
-        addIfNotExist(cluster, keyspace, sensornameColumnFamily);
-    }
+   }
 
     private void addIfNotExist(Cluster cluster, Keyspace keyspace, ColumnFamilyDefinition def) {
         //todo:racy
@@ -73,11 +47,26 @@ public class DatapointRepository {
         }
     }
 
+    public void createColumnFamilies(String customer){
+        ColumnFamilyDefinition datapointColumnFamily = HFactory.createColumnFamilyDefinition(
+                keyspace.getKeyspaceName(), toDatapointCfName(customer), ComparatorType.UUIDTYPE);
+
+        addIfNotExist(cluster, keyspace, datapointColumnFamily);
+
+        ColumnFamilyDefinition sensornameColumnFamily = HFactory.createColumnFamilyDefinition(
+                keyspace.getKeyspaceName(), toSensornamesCfName(customer), ComparatorType.COMPOSITETYPE);
+        sensornameColumnFamily.setComparatorTypeAlias("(TimeUUIDType, UTF8Type)");
+        sensornameColumnFamily.setKeyValidationClass("UTF8Type");
+        sensornameColumnFamily.setDefaultValidationClass("UTF8Type");
+
+        addIfNotExist(cluster, keyspace, sensornameColumnFamily);
+    }
+
     public static UUID toTimeUUID(long time) {
         return new UUID(TimeUUIDUtils.getTimeUUID(time).toString());
     }
 
-    public void update(String sensor, long timeMs, String value) {
+    public void update(String customer, String sensor, long timeMs, String value) {
         UUID timeUUID = toTimeUUID(timeMs);
 
         //inserts the sensor value
@@ -88,7 +77,7 @@ public class DatapointRepository {
                 TimeUUIDSerializer.get(),
                 StringSerializer.get());
         datapointColumn.setTtl(ttlMs);
-        datapointMutator.addInsertion(sensor, datapointColumnFamily.getName(), datapointColumn);
+        datapointMutator.addInsertion(sensor, toDatapointCfName(customer), datapointColumn);
         datapointMutator.execute();
 
         //inserts the sensor name
@@ -103,36 +92,46 @@ public class DatapointRepository {
                 new CompositeSerializer(),
                 StringSerializer.get());
         sensornameColumn.setTtl(ttlMs);
-        sensornameMutator.addInsertion("name", sensornameColumnFamily.getName(), sensornameColumn);
+        sensornameMutator.addInsertion("name", toSensornamesCfName(customer), sensornameColumn);
         sensornameMutator.execute();
     }
 
-    public String read(String sensor, long time) {
-       // QueryResult<String,UUID> query = HFactory.cr().execute();
-
-
-        ColumnFamilyResult<String, UUID> res = datapointTemplate.queryColumns(sensor);
-        return res.getString(toTimeUUID(time));
+    private String toDatapointCfName(String customer){
+        return name+"_"+customer;
     }
 
-    public void delete(String sensor, long time) {
+    private String toSensornamesCfName(String customer){
+        return name+"_"+customer+"_names";
+    }
+
+    public String read(String customer, String sensor, long time) {
+        ColumnQuery<String,UUID, String> query = HFactory.createColumnQuery(keyspace,StringSerializer.get(), TimeUUIDSerializer.get(),StringSerializer.get());
+        query.setColumnFamily(toDatapointCfName(customer));
+        query.setKey(sensor);
+        query.setName(toTimeUUID(time));
+
+        HColumn<UUID,String> result = query.execute().get();
+        return result == null?null:result.getValue();
+    }
+
+    public void delete(String customer, String sensor, long time) {
         Mutator<String> mutator = createMutator(keyspace, StringSerializer.get());
-        mutator.delete(sensor, datapointColumnFamily.getName(), toTimeUUID(time), TimeUUIDSerializer.get());
+        mutator.delete(sensor, toDatapointCfName(customer), toTimeUUID(time), TimeUUIDSerializer.get());
         mutator.execute();
 
         //todo: the sensor name should be deleted.
     }
 
-    public void deleteSensor(String sensor) {
+    public void deleteSensor(String customer, String sensor) {
         Mutator<String> mutator = createMutator(keyspace, StringSerializer.get());
-        mutator.addDeletion(sensor, datapointColumnFamily.getName());
+        mutator.addDeletion(sensor, toDatapointCfName(customer));
         mutator.execute();
     }
 
-    public Map<UUID, String> selectColumnsBetween(String sensor, long startMs, long endMs) {
+    public Map<UUID, String> selectColumnsBetween(String customer, String sensor, long startMs, long endMs) {
         SliceQuery<String, UUID, String> query = createSliceQuery(keyspace, StringSerializer.get(), TimeUUIDSerializer.get(), StringSerializer.get())
                 .setKey(sensor)
-                .setColumnFamily(datapointColumnFamily.getName());
+                .setColumnFamily(toDatapointCfName(customer));
 
         ColumnSliceIterator<String, UUID, String> iterator =
                 new ColumnSliceIterator<String, UUID, String>(query, toTimeUUID(startMs), toTimeUUID(endMs), false);
@@ -145,19 +144,19 @@ public class DatapointRepository {
         return result;
     }
 
-    public ColumnSliceIterator<String, UUID, String> dataPointIterator(String sensor, long startMs, long endMs) {
+    public ColumnSliceIterator<String, UUID, String> dataPointIterator(String customer, String sensor, long startMs, long endMs) {
         SliceQuery<String, UUID, String> query = createSliceQuery(keyspace, StringSerializer.get(), TimeUUIDSerializer.get(), StringSerializer.get())
                 .setKey(sensor)
-                .setColumnFamily(datapointColumnFamily.getName());
+                .setColumnFamily(toDatapointCfName(customer));
 
         return new ColumnSliceIterator<String, UUID, String>(query, toTimeUUID(startMs), toTimeUUID(endMs), false);
     }
 
-    public Iterator<String> sensorNameIterator(long startMs, long endMs) {
+    public Iterator<String> sensorNameIterator(String customer, long startMs, long endMs) {
         SliceQuery<String, Composite, String> query = createSliceQuery(keyspace, StringSerializer.get(),
                 CompositeSerializer.get(),
                 StringSerializer.get());
-        query.setColumnFamily(sensornameColumnFamily.getName());
+        query.setColumnFamily(toSensornamesCfName(customer));
         query.setKey("name");
 
         // Create a composite search range

@@ -9,10 +9,12 @@ public class GenerateMeasurementsThread extends Thread {
     private final DatapointRepository datapointRepository;
     private final static AtomicLong operationCount = new AtomicLong();
     private final static Random random = new Random();
+    private final String customer;
 
-    public GenerateMeasurementsThread(DatapointRepository datapointRepository, String machine) {
+    public GenerateMeasurementsThread(DatapointRepository datapointRepository, String customer, String machine) {
         this.datapointRepository = datapointRepository;
         this.machine = machine;
+        this.customer = customer;
     }
 
     public void run() {
@@ -27,7 +29,7 @@ public class GenerateMeasurementsThread extends Thread {
             Measurement measurement = createMeasurement();
 
             for (Map.Entry<String, String> entry : measurement.map.entrySet()) {
-                datapointRepository.update(machine + ":" + entry.getKey(), measurement.timeMs, entry.getValue());
+                datapointRepository.update(customer, machine + ":" + entry.getKey(), measurement.timeMs, entry.getValue());
             }
         }
     }
