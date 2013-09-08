@@ -1,10 +1,6 @@
 package com;
 
-import com.aggregatefunctions.AggregateFunction;
 import com.aggregatefunctions.AggregateFunctionFactory;
-import com.eaio.uuid.UUID;
-import me.prettyprint.cassandra.service.ColumnSliceIterator;
-import me.prettyprint.hector.api.beans.HColumn;
 import org.apache.log4j.Logger;
 
 import java.util.Iterator;
@@ -50,7 +46,8 @@ public class RollupRunnable implements Runnable {
             for (String customer : customersRepository.getCustomers()) {
                 for (Iterator<String> it = source.sensorNameIterator(customer, startMs, endMs); it.hasNext(); ) {
                     String sensor = it.next();
-                    Future<?> future = executorService.submit(new ProcessRunnable(customer, sensor, startMs, endMs));
+                    SensorRollupRunnable task = new SensorRollupRunnable(customer, sensor, startMs, endMs, functionFactory.newAggregateFunction(), source, target);
+                    Future<?> future = executorService.submit(task);
                     futures.add(future);
                 }
             }
@@ -71,39 +68,5 @@ public class RollupRunnable implements Runnable {
         }
 
         startMs = endMs;
-    }
-
-    private class ProcessRunnable implements Runnable {
-        private final String sensor;
-        private final long startMs;
-        private final long endMs;
-        private final String customer;
-
-        private ProcessRunnable(String customer, String sensor, long startMs, long endMs) {
-            this.sensor = sensor;
-            this.startMs = startMs;
-            this.endMs = endMs;
-            this.customer = customer;
-        }
-
-        @Override
-        public void run() {
-            try {
-                AggregateFunction function = functionFactory.newAggregateFunction();
-                function.setPeriod(this.startMs, endMs);
-
-                ColumnSliceIterator<String, UUID, String> iterator = source.dataPointIterator(customer, sensor, startMs, endMs);
-
-                for (; iterator.hasNext(); ) {
-                    HColumn<UUID, String> columns = iterator.next();
-                    long value = new Long(columns.getValue());
-                    function.feed(value);
-                }
-
-                target.update(customer, sensor, startMs, "" + function.result());
-            } catch (Throwable e) {
-                logger.warn("Failed to compact", e);
-            }
-        }
     }
 }

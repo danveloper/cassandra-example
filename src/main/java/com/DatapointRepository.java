@@ -23,25 +23,18 @@ import static me.prettyprint.hector.api.factory.HFactory.createMutator;
 import static me.prettyprint.hector.api.factory.HFactory.createSliceQuery;
 
 
-public class DatapointRepository {
-    private final Keyspace keyspace;
-    private final Cluster cluster;
-
+public class DatapointRepository extends AbstractRepository {
     private final int ttlMs;
     private final String name;
 
-    public DatapointRepository(Cluster cluster, Keyspace Keyspace, String name, int ttlMs) {
+    public DatapointRepository(Cluster cluster, Keyspace keyspace, String name, int ttlMs) {
+        super(cluster, keyspace);
         this.name = name.toLowerCase();
-        this.cluster = cluster;
-        this.keyspace = Keyspace;
         this.ttlMs = ttlMs;
     }
 
-    private void addIfNotExist(Cluster cluster, Keyspace keyspace, ColumnFamilyDefinition def) {
-        //todo:racy
-        if (!contains(def, keyspace.getKeyspaceName())) {
-            cluster.addColumnFamily(def);
-        }
+    public String getName() {
+        return name;
     }
 
     private String toDatapointCfName(String customer) {
@@ -60,7 +53,7 @@ public class DatapointRepository {
         ColumnFamilyDefinition datapointColumnFamily = HFactory.createColumnFamilyDefinition(
                 keyspace.getKeyspaceName(), toDatapointCfName(customer), ComparatorType.UUIDTYPE);
 
-        addIfNotExist(cluster, keyspace, datapointColumnFamily);
+        add(datapointColumnFamily);
 
         ColumnFamilyDefinition sensornameColumnFamily = HFactory.createColumnFamilyDefinition(
                 keyspace.getKeyspaceName(), toSensornamesCfName(customer), ComparatorType.COMPOSITETYPE);
@@ -68,7 +61,7 @@ public class DatapointRepository {
         sensornameColumnFamily.setKeyValidationClass("UTF8Type");
         sensornameColumnFamily.setDefaultValidationClass("UTF8Type");
 
-        addIfNotExist(cluster, keyspace, sensornameColumnFamily);
+        add(sensornameColumnFamily);
     }
 
     public void update(String customer, String sensor, long timeMs, String value) {
@@ -176,14 +169,4 @@ public class DatapointRepository {
         return result.iterator();
     }
 
-    private boolean contains(ColumnFamilyDefinition columnFamilyDefinition, String keyspace) {
-        List<ColumnFamilyDefinition> columnFamilyDefinitions = cluster.describeKeyspace(keyspace).getCfDefs();
-        for (ColumnFamilyDefinition def : columnFamilyDefinitions) {
-            if (def.getName().equals(columnFamilyDefinition.getName())) {
-                return true;
-            }
-        }
-
-        return false;
-    }
 }
