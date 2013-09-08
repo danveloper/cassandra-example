@@ -23,34 +23,36 @@ public class RollupRunnable implements Runnable {
     private final String description;
     private final AggregateFunctionFactory functionFactory;
     private final ExecutorService executorService;
-    private final String customer;
+    private final CustomersRepository customersRepository;
     private long startMs = System.currentTimeMillis();
 
     public RollupRunnable(DatapointRepository source, DatapointRepository target, String description,
-                          AggregateFunctionFactory functionFactory, ExecutorService executorService, String customer) {
+                          AggregateFunctionFactory functionFactory, ExecutorService executorService, CustomersRepository customersRepository) {
         this.source = source;
         this.target = target;
         this.description = description;
         this.functionFactory = functionFactory;
         this.executorService = executorService;
-        this.customer = customer;
+        this.customersRepository = customersRepository;
     }
 
     @Override
     public void run() {
-        logger.info("Compacting " + description);
 
         long endMs = System.currentTimeMillis();
-        if(endMs<=startMs){
-            endMs = startMs+1;
+        if (endMs <= startMs) {
+            endMs = startMs + 1;
         }
         try {
 
             List<Future> futures = new LinkedList<Future>();
-            for (Iterator<String> it = source.sensorNameIterator(customer,startMs, endMs); it.hasNext(); ) {
-                String sensor = it.next();
-                Future<?> future = executorService.submit(new ProcessRunnable(customer, sensor, startMs, endMs));
-                futures.add(future);
+
+            for (String customer : customersRepository.getCustomers()) {
+                for (Iterator<String> it = source.sensorNameIterator(customer, startMs, endMs); it.hasNext(); ) {
+                    String sensor = it.next();
+                    Future<?> future = executorService.submit(new ProcessRunnable(customer, sensor, startMs, endMs));
+                    futures.add(future);
+                }
             }
 
             for (Future future : futures) {
@@ -62,6 +64,8 @@ public class RollupRunnable implements Runnable {
                     logger.warn(e.getMessage(), e);
                 }
             }
+
+            System.out.println("Finished compacting "+description+" sensors:"+futures.size());
         } catch (Throwable t) {
             logger.warn("Failed to compact " + description, t);
         }
@@ -79,7 +83,7 @@ public class RollupRunnable implements Runnable {
             this.sensor = sensor;
             this.startMs = startMs;
             this.endMs = endMs;
-            this.customer  = customer;
+            this.customer = customer;
         }
 
         @Override
@@ -88,7 +92,7 @@ public class RollupRunnable implements Runnable {
                 AggregateFunction function = functionFactory.newAggregateFunction();
                 function.setPeriod(this.startMs, endMs);
 
-                ColumnSliceIterator<String, UUID, String> iterator = source.dataPointIterator(customer,sensor, startMs, endMs);
+                ColumnSliceIterator<String, UUID, String> iterator = source.dataPointIterator(customer, sensor, startMs, endMs);
 
                 for (; iterator.hasNext(); ) {
                     HColumn<UUID, String> columns = iterator.next();
@@ -96,7 +100,7 @@ public class RollupRunnable implements Runnable {
                     function.feed(value);
                 }
 
-                target.update(customer,sensor, startMs, "" + function.result());
+                target.update(customer, sensor, startMs, "" + function.result());
             } catch (Throwable e) {
                 logger.warn("Failed to compact", e);
             }

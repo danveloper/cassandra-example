@@ -14,31 +14,36 @@ import me.prettyprint.hector.api.factory.HFactory;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Map;
-import java.util.concurrent.*;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 public class Main {
 
-    public static void main(String[] args) throws InterruptedException {
-        Cluster cluster = HFactory.getOrCreateCluster("test-cluster", "localhost:9160");
-        Keyspace keyspace = createKeyspace(cluster, "Measurements");
+    private final Cluster cluster;
+    private final Keyspace keyspace;
+    private final CustomersRepository customersRepository;
+    private final DatapointRepository rawRepo;
+    private final DatapointRepository avgSecondRepo;
+    private final DatapointRepository avgFiveSecondRepo;
+    private final DatapointRepository avg30SecondRepo;
+    private final DatapointRepository maxFiveSecondRepo;
+    private final ThreadPoolExecutor executor;
+    private final ScheduledThreadPoolExecutor scheduler;
 
-        String customer = "hazelcast";
+    public Main() {
+        cluster = HFactory.getOrCreateCluster("test-cluster", "localhost:9160");
+        keyspace = createKeyspace(cluster, "Measurements");
 
-        DatapointRepository rawRepo = new DatapointRepository(cluster, keyspace, "Measurements", (int) TimeUnit.HOURS.toMillis(1));
-        DatapointRepository avgSecondRepo = new DatapointRepository(cluster, keyspace, "averageSecond", (int) TimeUnit.HOURS.toMillis(1));
-        DatapointRepository avgFiveSecondRepo = new DatapointRepository(cluster, keyspace, "averageFiveSeconds", (int) TimeUnit.HOURS.toMillis(1));
-        DatapointRepository avg30SecondRepo = new DatapointRepository(cluster, keyspace, "average30Seconds", (int) TimeUnit.HOURS.toMillis(1));
-        DatapointRepository maxFiveSecondRepo = new DatapointRepository(cluster, keyspace, "maxFiveSeconds", (int) TimeUnit.HOURS.toMillis(1));
-
-
-        rawRepo.createColumnFamilies(customer);
-        avgSecondRepo.createColumnFamilies(customer);
-        avgFiveSecondRepo.createColumnFamilies(customer);
-        avg30SecondRepo.createColumnFamilies(customer);
-        maxFiveSecondRepo.createColumnFamilies(customer);
-
-        ScheduledExecutorService scheduler = new ScheduledThreadPoolExecutor(10);
-        ExecutorService executor = new ThreadPoolExecutor(10, 50, 1, TimeUnit.MINUTES, new LinkedBlockingQueue<Runnable>());
+        customersRepository = new CustomersRepository(cluster, keyspace);
+        rawRepo = new DatapointRepository(cluster, keyspace, "Measurements", (int) TimeUnit.HOURS.toMillis(1));
+        avgSecondRepo = new DatapointRepository(cluster, keyspace, "averageSecond", (int) TimeUnit.HOURS.toMillis(1));
+        avgFiveSecondRepo = new DatapointRepository(cluster, keyspace, "averageFiveSeconds", (int) TimeUnit.HOURS.toMillis(1));
+        avg30SecondRepo = new DatapointRepository(cluster, keyspace, "average30Seconds", (int) TimeUnit.HOURS.toMillis(1));
+        maxFiveSecondRepo = new DatapointRepository(cluster, keyspace, "maxFiveSeconds", (int) TimeUnit.HOURS.toMillis(1));
+        scheduler = new ScheduledThreadPoolExecutor(10);
+        executor = new ThreadPoolExecutor(10, 50, 1, TimeUnit.MINUTES, new LinkedBlockingQueue<Runnable>());
 
         scheduler.scheduleAtFixedRate(
                 new RollupRunnable(
@@ -46,7 +51,7 @@ public class Main {
                         avgSecondRepo,
                         "average 1 second",
                         new AggregateFunctionFactory(AverageFunction.class),
-                        executor, customer),
+                        executor, customersRepository),
                 0, 1, TimeUnit.SECONDS);
         scheduler.scheduleAtFixedRate(
                 new RollupRunnable(
@@ -54,7 +59,7 @@ public class Main {
                         avgFiveSecondRepo,
                         "average 5 seconds",
                         new AggregateFunctionFactory(AverageFunction.class),
-                        executor, customer),
+                        executor, customersRepository),
                 0, 5, TimeUnit.SECONDS);
         scheduler.scheduleAtFixedRate(
                 new RollupRunnable(
@@ -62,7 +67,7 @@ public class Main {
                         avg30SecondRepo,
                         "average 30 seconds",
                         new AggregateFunctionFactory(AverageFunction.class),
-                        executor, customer),
+                        executor, customersRepository),
                 0, 30, TimeUnit.SECONDS);
         scheduler.scheduleAtFixedRate(
                 new RollupRunnable(
@@ -70,17 +75,32 @@ public class Main {
                         maxFiveSecondRepo,
                         "maximum 5 seconds",
                         new AggregateFunctionFactory(MaximumFunction.class),
-                        executor, customer),
+                        executor, customersRepository),
                 0, 5, TimeUnit.SECONDS);
+    }
 
+    public void registerCustomer(String customer) {
+        rawRepo.createColumnFamilies(customer);
+        avgSecondRepo.createColumnFamilies(customer);
+        avgFiveSecondRepo.createColumnFamilies(customer);
+        avg30SecondRepo.createColumnFamilies(customer);
+        maxFiveSecondRepo.createColumnFamilies(customer);
+        customersRepository.save(customer);
+    }
+
+    public void start() throws InterruptedException {
         long startTime = System.currentTimeMillis();
 
-        new GenerateMeasurementsThread(rawRepo, customer, "dev:192.168.1.1:5701").start();
+        String customer = "foo";
+        registerCustomer(customer);
+        System.out.println("Customers: "+customersRepository.getCustomers());
+
+        new GenerateMeasurementsThread(rawRepo,customer, "dev:192.168.1.1:5701").start();
         new GenerateMeasurementsThread(rawRepo, customer, "dev:192.168.1.1:5702").start();
         new GenerateMeasurementsThread(rawRepo, customer, "prod:192.168.1.1:5703").start();
         new GenerateMeasurementsThread(rawRepo, customer, "prod:192.168.1.1:5704").start();
 
-        Thread.sleep(60000);
+        Thread.sleep(10000);
 
         long endTime = System.currentTimeMillis();
 
@@ -89,17 +109,16 @@ public class Main {
             System.out.println("    " + it.next());
         }
 
-  //      System.out.println("average seconds:");
-  //      print(avgSecondRepo, customer, startTime, endTime);
- //       System.out.println("average 5 seconds:");
- //       print(avgFiveSecondRepo, customer, startTime, endTime);
- //       System.out.println("max 5 seconds:");
- //       print(maxFiveSecondRepo, customer, startTime, endTime);
-        System.out.println("avg 30 seconds:");
-        print(avg30SecondRepo, customer, startTime, endTime);
+        System.out.println("avg 5 seconds:");
+        print(avgFiveSecondRepo, customer, startTime, endTime);
 
         System.out.println("finished");
         System.exit(0);
+    }
+
+    public static void main(String[] args) throws InterruptedException {
+        Main main = new Main();
+        main.start();
     }
 
     private static void print(DatapointRepository repository, String customer, long startTime, long endTime) {

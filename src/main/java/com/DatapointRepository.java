@@ -5,8 +5,6 @@ import me.prettyprint.cassandra.serializers.CompositeSerializer;
 import me.prettyprint.cassandra.serializers.StringSerializer;
 import me.prettyprint.cassandra.serializers.TimeUUIDSerializer;
 import me.prettyprint.cassandra.service.ColumnSliceIterator;
-import me.prettyprint.cassandra.service.template.ColumnFamilyResult;
-import me.prettyprint.cassandra.service.template.ThriftColumnFamilyTemplate;
 import me.prettyprint.cassandra.utils.TimeUUIDUtils;
 import me.prettyprint.hector.api.Cluster;
 import me.prettyprint.hector.api.Keyspace;
@@ -17,7 +15,6 @@ import me.prettyprint.hector.api.ddl.ComparatorType;
 import me.prettyprint.hector.api.factory.HFactory;
 import me.prettyprint.hector.api.mutation.Mutator;
 import me.prettyprint.hector.api.query.ColumnQuery;
-import me.prettyprint.hector.api.query.QueryResult;
 import me.prettyprint.hector.api.query.SliceQuery;
 
 import java.util.*;
@@ -38,7 +35,7 @@ public class DatapointRepository {
         this.cluster = cluster;
         this.keyspace = Keyspace;
         this.ttlMs = ttlMs;
-   }
+    }
 
     private void addIfNotExist(Cluster cluster, Keyspace keyspace, ColumnFamilyDefinition def) {
         //todo:racy
@@ -47,7 +44,19 @@ public class DatapointRepository {
         }
     }
 
-    public void createColumnFamilies(String customer){
+    private String toDatapointCfName(String customer) {
+        return name + "_" + customer;
+    }
+
+    private String toSensornamesCfName(String customer) {
+        return name + "_" + customer + "_names";
+    }
+
+    public static UUID toTimeUUID(long time) {
+        return new UUID(TimeUUIDUtils.getTimeUUID(time).toString());
+    }
+
+    public void createColumnFamilies(String customer) {
         ColumnFamilyDefinition datapointColumnFamily = HFactory.createColumnFamilyDefinition(
                 keyspace.getKeyspaceName(), toDatapointCfName(customer), ComparatorType.UUIDTYPE);
 
@@ -60,10 +69,6 @@ public class DatapointRepository {
         sensornameColumnFamily.setDefaultValidationClass("UTF8Type");
 
         addIfNotExist(cluster, keyspace, sensornameColumnFamily);
-    }
-
-    public static UUID toTimeUUID(long time) {
-        return new UUID(TimeUUIDUtils.getTimeUUID(time).toString());
     }
 
     public void update(String customer, String sensor, long timeMs, String value) {
@@ -96,22 +101,14 @@ public class DatapointRepository {
         sensornameMutator.execute();
     }
 
-    private String toDatapointCfName(String customer){
-        return name+"_"+customer;
-    }
-
-    private String toSensornamesCfName(String customer){
-        return name+"_"+customer+"_names";
-    }
-
     public String read(String customer, String sensor, long time) {
-        ColumnQuery<String,UUID, String> query = HFactory.createColumnQuery(keyspace,StringSerializer.get(), TimeUUIDSerializer.get(),StringSerializer.get());
+        ColumnQuery<String, UUID, String> query = HFactory.createColumnQuery(keyspace, StringSerializer.get(), TimeUUIDSerializer.get(), StringSerializer.get());
         query.setColumnFamily(toDatapointCfName(customer));
         query.setKey(sensor);
         query.setName(toTimeUUID(time));
 
-        HColumn<UUID,String> result = query.execute().get();
-        return result == null?null:result.getValue();
+        HColumn<UUID, String> result = query.execute().get();
+        return result == null ? null : result.getValue();
     }
 
     public void delete(String customer, String sensor, long time) {
@@ -153,22 +150,22 @@ public class DatapointRepository {
     }
 
     public Iterator<String> sensorNameIterator(String customer, long startMs, long endMs) {
+        Composite begin = new Composite();
+        begin.addComponent(toTimeUUID(startMs), TimeUUIDSerializer.get());
+        String beginString = "a";
+        begin.addComponent(beginString, StringSerializer.get());
+
+        Composite end = new Composite();
+        end.addComponent(toTimeUUID(endMs), TimeUUIDSerializer.get());
+        String endString = Character.toString(Character.MAX_VALUE);
+        end.addComponent(endString, StringSerializer.get());
+
         SliceQuery<String, Composite, String> query = createSliceQuery(keyspace, StringSerializer.get(),
                 CompositeSerializer.get(),
                 StringSerializer.get());
         query.setColumnFamily(toSensornamesCfName(customer));
         query.setKey("name");
-
-        // Create a composite search range
-        Composite start = new Composite();
-        start.addComponent(toTimeUUID(startMs), TimeUUIDSerializer.get());
-        start.addComponent("a", StringSerializer.get());
-
-        Composite finish = new Composite();
-        finish.addComponent(toTimeUUID(endMs), TimeUUIDSerializer.get());
-        finish.addComponent(Character.toString(Character.MAX_VALUE), StringSerializer.get());
-
-        query.setRange(start, finish, false, Integer.MAX_VALUE);
+        query.setRange(begin, end, false, Integer.MAX_VALUE);
 
         Iterator<HColumn<Composite, String>> iterator = query.execute().get().getColumns().iterator();
         Set<String> result = new HashSet<String>();

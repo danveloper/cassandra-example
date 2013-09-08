@@ -4,7 +4,6 @@ TODO:
     - a roller for minutes, is now allowed to overtake the roller of seconds.
     - the scheduling mechanism is not distributed
     - the scheduling mechanism is not able to deal with a restart
-    - the scheduling mechanism currently only deals with a single customer
 
 - aggregate function velocity
 
@@ -16,6 +15,8 @@ TODO:
 http://wiki.apache.org/cassandra/Embedding
 
 DONE
+
+- the scheduling mechanism currently only deals with a single customer
 
 - pass the customer family to the repository functions
 
