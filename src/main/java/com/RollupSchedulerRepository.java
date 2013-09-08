@@ -17,15 +17,15 @@ import java.util.Set;
 import static me.prettyprint.hector.api.factory.HFactory.createMutator;
 import static me.prettyprint.hector.api.factory.HFactory.createSliceQuery;
 
-public class SchedulerRepository extends AbstractRepository {
+public class RollupSchedulerRepository extends AbstractRepository {
 
     private final ColumnFamilyDefinition schedulerColumnFamily;
 
-    public SchedulerRepository(Cluster cluster, Keyspace keyspace) {
+    public RollupSchedulerRepository(Cluster cluster, Keyspace keyspace) {
         super(cluster, keyspace);
 
         schedulerColumnFamily = HFactory.createColumnFamilyDefinition(
-                keyspace.getKeyspaceName(), "SchedulerRepository", ComparatorType.UTF8TYPE);
+                keyspace.getKeyspaceName(), "RollupSchedulerRepository", ComparatorType.UTF8TYPE);
 
         add(schedulerColumnFamily);
     }

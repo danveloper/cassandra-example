@@ -2,18 +2,25 @@ package com;
 
 import java.util.Map;
 import java.util.Random;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.BlockingQueue;
 
 public class GenerateMeasurementsThread extends Thread {
-    private final String machine;
-    private final DatapointRepository datapointRepository;
-    private final static AtomicLong operationCount = new AtomicLong();
+
+    private final String[] clusters = new String[]{"dev", "staging", "prod"};
+    private final String[][] machines = new String[][]{
+            new String[]{"192.168.1.1:5701", "192.168.1.1:5702", "192.168.1.1:5703"},
+            new String[]{"192.168.2.1:5701", "192.168.2.2:5701", "192.168.2.3:5701"},
+            new String[]{"192.168.3.1:5701", "192.168.3.1:5701", "192.168.3.2:5701"}};
+
+    private final String[] maps = new String[]{"map1", "map2"};
+    private final long[] readCounters = new long[maps.length];
+    private final long[] writeCounters = new long[maps.length];
+    private final BlockingQueue<Measurement> measurementQueue;
     private final static Random random = new Random();
     private final String customer;
 
-    public GenerateMeasurementsThread(DatapointRepository datapointRepository, String customer, String machine) {
-        this.datapointRepository = datapointRepository;
-        this.machine = machine;
+    public GenerateMeasurementsThread(BlockingQueue<Measurement> measurementQueue, String customer) {
+        this.measurementQueue = measurementQueue;
         this.customer = customer;
     }
 
@@ -22,24 +29,36 @@ public class GenerateMeasurementsThread extends Thread {
 
         for (; ; ) {
             try {
-                Thread.sleep(random.nextInt(100));
+                Thread.sleep(random.nextInt(10));
             } catch (InterruptedException e) {
             }
 
             Measurement measurement = createMeasurement();
-
-            for (Map.Entry<String, String> entry : measurement.map.entrySet()) {
-                datapointRepository.update(customer, machine + ":" + entry.getKey(), measurement.timeMs, entry.getValue());
-            }
+            measurementQueue.add(measurement);
         }
     }
 
-    public static Measurement createMeasurement() {
+    public Measurement createMeasurement() {
         Measurement measurement = new Measurement();
+        measurement.customer = customer;
+        int clusterIndex = random.nextInt(clusters.length);
+        measurement.environment = clusters[clusterIndex];
+        String[] machinesForEnvironment = machines[clusterIndex];
+        measurement.machine = machinesForEnvironment[random.nextInt(machinesForEnvironment.length)];
         measurement.timeMs = System.currentTimeMillis();
-        measurement.map.put("operationXCount", "" + operationCount.addAndGet(random.nextInt(100)));
-        measurement.map.put("operationYCount", "" + operationCount.addAndGet(random.nextInt(100)));
-        return measurement;
+        int mapIndex = random.nextInt(maps.length);
+        measurement.subject = maps[mapIndex];
 
+        long readCount = readCounters[mapIndex];
+        readCount += random.nextInt(100);
+        readCounters[mapIndex] = readCount;
+
+        long writeCount = writeCounters[mapIndex];
+        writeCount += random.nextInt(50);
+        writeCounters[mapIndex] = writeCount;
+
+        measurement.map.put("readCount", "" + readCount);
+        measurement.map.put("writeCount", "" + writeCount);
+        return measurement;
     }
 }

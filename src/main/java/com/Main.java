@@ -10,13 +10,17 @@ import me.prettyprint.hector.api.Keyspace;
 import me.prettyprint.hector.api.ddl.ColumnFamilyDefinition;
 import me.prettyprint.hector.api.ddl.KeyspaceDefinition;
 import me.prettyprint.hector.api.factory.HFactory;
+import org.apache.log4j.Logger;
 
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Map;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 public class Main {
+    private final static Logger logger = Logger.getLogger(RollupRunnable.class);
 
     private final Cluster cluster;
     private final Keyspace keyspace;
@@ -27,19 +31,20 @@ public class Main {
     private final DatapointRepository avg30SecondRepo;
     private final DatapointRepository maxFiveSecondRepo;
     private final RollupScheduler scheduler;
-    private final SchedulerRepository schedulerRepository;
+    private final RollupSchedulerRepository schedulerRepository;
+    private final BlockingQueue<Measurement> measurementQueue = new LinkedBlockingQueue<Measurement>();
 
     public Main() {
         cluster = HFactory.getOrCreateCluster("test-cluster", "localhost:9160");
         keyspace = createKeyspace(cluster, "Measurements");
 
         customersRepository = new CustomersRepository(cluster, keyspace);
-        schedulerRepository = new SchedulerRepository(cluster,keyspace);
+        schedulerRepository = new RollupSchedulerRepository(cluster, keyspace);
         rawRepo = new DatapointRepository(cluster, keyspace, "Measurements", (int) TimeUnit.HOURS.toMillis(1));
-        avgSecondRepo = new DatapointRepository(cluster, keyspace, "averageSecond", (int) TimeUnit.HOURS.toMillis(1));
-        avgFiveSecondRepo = new DatapointRepository(cluster, keyspace, "averageFiveSeconds", (int) TimeUnit.HOURS.toMillis(1));
-        avg30SecondRepo = new DatapointRepository(cluster, keyspace, "average30Seconds", (int) TimeUnit.HOURS.toMillis(1));
-        maxFiveSecondRepo = new DatapointRepository(cluster, keyspace, "maxFiveSeconds", (int) TimeUnit.HOURS.toMillis(1));
+        avgSecondRepo = new DatapointRepository(cluster, keyspace, "AverageSecond", (int) TimeUnit.HOURS.toMillis(1));
+        avgFiveSecondRepo = new DatapointRepository(cluster, keyspace, "AverageFiveSeconds", (int) TimeUnit.HOURS.toMillis(1));
+        avg30SecondRepo = new DatapointRepository(cluster, keyspace, "Average30Seconds", (int) TimeUnit.HOURS.toMillis(1));
+        maxFiveSecondRepo = new DatapointRepository(cluster, keyspace, "MaxFiveSeconds", (int) TimeUnit.HOURS.toMillis(1));
 
         scheduler = new RollupScheduler(schedulerRepository, customersRepository);
         scheduler.schedule(rawRepo, avgSecondRepo, new AggregateFunctionFactory(AverageFunction.class), 1000);
@@ -64,10 +69,23 @@ public class Main {
         registerCustomer(customer);
         System.out.println("Customers: " + customersRepository.getCustomers());
 
-        new GenerateMeasurementsThread(rawRepo, customer, "dev:192.168.1.1:5701").start();
-        new GenerateMeasurementsThread(rawRepo, customer, "dev:192.168.1.1:5702").start();
-        new GenerateMeasurementsThread(rawRepo, customer, "prod:192.168.1.1:5703").start();
-        new GenerateMeasurementsThread(rawRepo, customer, "prod:192.168.1.1:5704").start();
+        new GenerateMeasurementsThread(measurementQueue, customer).start();
+
+        new Thread() {
+            public void run() {
+                try {
+                    for (; ; ) {
+                        Measurement measurement = measurementQueue.take();
+                        for (Map.Entry<String, String> entry : measurement.map.entrySet()) {
+                            String sensor = measurement.environment + ":" + measurement.machine + ":" + measurement.subject + ":" + entry.getKey();
+                            rawRepo.insert(measurement.customer, sensor, measurement.timeMs, entry.getValue());
+                        }
+                    }
+                } catch (Throwable t) {
+                    logger.error(t);
+                }
+            }
+        }.start();
 
         Thread.sleep(10000);
 
@@ -79,6 +97,7 @@ public class Main {
         System.out.println("finished");
         System.exit(0);
     }
+
 
     public static void main(String[] args) throws InterruptedException {
         Main main = new Main();

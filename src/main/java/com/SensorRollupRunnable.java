@@ -45,7 +45,7 @@ public class SensorRollupRunnable implements Runnable {
                 function.feed(value);
             }
 
-            target.update(customer, sensor, startMs, "" + function.result());
+            target.insert(customer, sensor, startMs, "" + function.result());
         } catch (Throwable e) {
             logger.warn("Failed to do a rollup", e);
         }

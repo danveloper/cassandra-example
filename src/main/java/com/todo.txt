@@ -14,6 +14,13 @@ TODO:
 - embedded cassandra
 http://wiki.apache.org/cassandra/Embedding
 
+- aggregate from multiple machines, same cluster, for the same 'distributed object'.
+
+- tables per environment?
+    - an additional set of tables could be created. Where
+
+- a keyspace per customer?
+
 DONE
 
 - the scheduling mechanism currently only deals with a single customer

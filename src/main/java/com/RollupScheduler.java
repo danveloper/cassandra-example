@@ -9,9 +9,9 @@ public class RollupScheduler {
     private final ScheduledExecutorService scheduler = new ScheduledThreadPoolExecutor(10);
     private final ExecutorService executor = new ThreadPoolExecutor(10, 50, 1, TimeUnit.MINUTES, new LinkedBlockingQueue<Runnable>());
     private final CustomersRepository customersRepository;
-    private final SchedulerRepository schedulerRepository;
+    private final RollupSchedulerRepository schedulerRepository;
 
-    public RollupScheduler(SchedulerRepository schedulerRepository, CustomersRepository customersRepository) {
+    public RollupScheduler(RollupSchedulerRepository schedulerRepository, CustomersRepository customersRepository) {
         this.customersRepository = customersRepository;
         this.schedulerRepository = schedulerRepository;
     }

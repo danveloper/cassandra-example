@@ -64,7 +64,7 @@ public class DatapointRepository extends AbstractRepository {
         add(sensornameColumnFamily);
     }
 
-    public void update(String customer, String sensor, long timeMs, String value) {
+    public void insert(String customer, String sensor, long timeMs, String value) {
         UUID timeUUID = toTimeUUID(timeMs);
 
         //inserts the sensor value
