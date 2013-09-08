@@ -1,6 +1,5 @@
 package com;
 
-import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.BlockingQueue;
 
@@ -57,8 +56,8 @@ public class GenerateMeasurementsThread extends Thread {
         writeCount += random.nextInt(50);
         writeCounters[mapIndex] = writeCount;
 
-        measurement.map.put("readCount", "" + readCount);
-        measurement.map.put("writeCount", "" + writeCount);
+        measurement.map.put("readCount", readCount);
+        measurement.map.put("writeCount",writeCount);
         return measurement;
     }
 }

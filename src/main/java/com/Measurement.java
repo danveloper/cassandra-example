@@ -10,5 +10,5 @@ public class Measurement {
     public String customer;
     public String machine;
     public String subject;
-    public Map<String, String> map = new HashMap();
+    public Map<String, Long> map = new HashMap<String,Long>();
 }

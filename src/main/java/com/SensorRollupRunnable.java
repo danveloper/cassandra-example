@@ -37,15 +37,15 @@ public class SensorRollupRunnable implements Runnable {
         try {
             function.setPeriod(startMs, endMs);
 
-            ColumnSliceIterator<String, UUID, String> iterator = source.dataPointIterator(customer, sensor, startMs, endMs);
+            ColumnSliceIterator<String, UUID, Long> iterator = source.dataPointIterator(customer, sensor, startMs, endMs);
 
             for (; iterator.hasNext(); ) {
-                HColumn<UUID, String> columns = iterator.next();
-                long value = new Long(columns.getValue());
+                HColumn<UUID, Long> columns = iterator.next();
+                long value = columns.getValue();
                 function.feed(value);
             }
 
-            target.insert(customer, sensor, startMs, "" + function.result());
+            target.insert(customer, sensor, startMs,  function.result());
         } catch (Throwable e) {
             logger.warn("Failed to do a rollup", e);
         }

@@ -23,6 +23,8 @@ http://wiki.apache.org/cassandra/Embedding
 
 DONE
 
+- type of the value column for the measurement is changed to long; needed for counter
+
 - the scheduling mechanism currently only deals with a single customer
 
 - pass the customer family to the repository functions

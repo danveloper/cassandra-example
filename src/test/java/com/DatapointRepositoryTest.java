@@ -53,15 +53,15 @@ public class DatapointRepositoryTest {
     @Test
     public void readExisting() {
         long time = System.currentTimeMillis();
-        repository.insert(customer, "foo", time, "1");
-        String result = repository.read(customer,"foo", time);
-        assertEquals("1", result);
+        repository.insert(customer, "foo", time, 1);
+        Long result = repository.read(customer,"foo", time);
+        assertEquals(new Long(1), result);
     }
 
     @Test
     public void readNonExisting() {
         long time = System.currentTimeMillis();
-        String result = repository.read(customer,"foo", time);
+        Long result = repository.read(customer,"foo", time);
         assertNull(result);
     }
 
@@ -75,10 +75,10 @@ public class DatapointRepositoryTest {
     @Test
     public void sensorNameIterator_multipleNames() {
         long time = System.currentTimeMillis();
-        repository.insert(customer, "foo", time, "1");
-        repository.insert(customer, "bar", time, "1");
+        repository.insert(customer, "foo", time, 1);
+        repository.insert(customer, "bar", time, 1);
 
-        Set<String> names = toSet(repository.sensorNameIterator(customer,time, time));
+        Set <String> names = toSet(repository.sensorNameIterator(customer,time, time));
         assertEquals(2, names.size());
         assertTrue(names.contains("foo"));
         assertTrue(names.contains("bar"));

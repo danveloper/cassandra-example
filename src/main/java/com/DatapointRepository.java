@@ -2,6 +2,7 @@ package com;
 
 import com.eaio.uuid.UUID;
 import me.prettyprint.cassandra.serializers.CompositeSerializer;
+import me.prettyprint.cassandra.serializers.LongSerializer;
 import me.prettyprint.cassandra.serializers.StringSerializer;
 import me.prettyprint.cassandra.serializers.TimeUUIDSerializer;
 import me.prettyprint.cassandra.service.ColumnSliceIterator;
@@ -64,16 +65,16 @@ public class DatapointRepository extends AbstractRepository {
         add(sensornameColumnFamily);
     }
 
-    public void insert(String customer, String sensor, long timeMs, String value) {
+    public void insert(String customer, String sensor, long timeMs, long value) {
         UUID timeUUID = toTimeUUID(timeMs);
 
         //inserts the sensor value
         Mutator<String> datapointMutator = createMutator(keyspace, StringSerializer.get());
-        HColumn<UUID, String> datapointColumn = HFactory.createColumn(
+        HColumn<UUID, Long> datapointColumn = HFactory.createColumn(
                 timeUUID,
                 value,
                 TimeUUIDSerializer.get(),
-                StringSerializer.get());
+                LongSerializer.get());
         datapointColumn.setTtl(ttlMs);
         datapointMutator.addInsertion(sensor, toDatapointCfName(customer), datapointColumn);
         datapointMutator.execute();
@@ -94,13 +95,13 @@ public class DatapointRepository extends AbstractRepository {
         sensornameMutator.execute();
     }
 
-    public String read(String customer, String sensor, long time) {
-        ColumnQuery<String, UUID, String> query = HFactory.createColumnQuery(keyspace, StringSerializer.get(), TimeUUIDSerializer.get(), StringSerializer.get());
+    public Long read(String customer, String sensor, long time) {
+        ColumnQuery<String, UUID, Long> query = HFactory.createColumnQuery(keyspace, StringSerializer.get(), TimeUUIDSerializer.get(), LongSerializer.get());
         query.setColumnFamily(toDatapointCfName(customer));
         query.setKey(sensor);
         query.setName(toTimeUUID(time));
 
-        HColumn<UUID, String> result = query.execute().get();
+        HColumn<UUID, Long> result = query.execute().get();
         return result == null ? null : result.getValue();
     }
 
@@ -118,28 +119,28 @@ public class DatapointRepository extends AbstractRepository {
         mutator.execute();
     }
 
-    public Map<UUID, String> selectColumnsBetween(String customer, String sensor, long startMs, long endMs) {
-        SliceQuery<String, UUID, String> query = createSliceQuery(keyspace, StringSerializer.get(), TimeUUIDSerializer.get(), StringSerializer.get())
+    public Map<UUID, Long> selectColumnsBetween(String customer, String sensor, long startMs, long endMs) {
+        SliceQuery<String, UUID, Long> query = createSliceQuery(keyspace, StringSerializer.get(), TimeUUIDSerializer.get(), LongSerializer.get())
                 .setKey(sensor)
                 .setColumnFamily(toDatapointCfName(customer));
 
-        ColumnSliceIterator<String, UUID, String> iterator =
-                new ColumnSliceIterator<String, UUID, String>(query, toTimeUUID(startMs), toTimeUUID(endMs), false);
+        ColumnSliceIterator<String, UUID, Long> iterator =
+                new ColumnSliceIterator<String, UUID, Long>(query, toTimeUUID(startMs), toTimeUUID(endMs), false);
 
-        LinkedHashMap<UUID, String> result = new LinkedHashMap<UUID, String>();
+        LinkedHashMap<UUID, Long> result = new LinkedHashMap<UUID, Long>();
         while (iterator.hasNext()) {
-            HColumn<UUID, String> c = iterator.next();
+            HColumn<UUID, Long> c = iterator.next();
             result.put(c.getName(), c.getValue());
         }
         return result;
     }
 
-    public ColumnSliceIterator<String, UUID, String> dataPointIterator(String customer, String sensor, long startMs, long endMs) {
-        SliceQuery<String, UUID, String> query = createSliceQuery(keyspace, StringSerializer.get(), TimeUUIDSerializer.get(), StringSerializer.get())
+    public ColumnSliceIterator<String, UUID, Long> dataPointIterator(String customer, String sensor, long startMs, long endMs) {
+        SliceQuery<String, UUID, Long> query = createSliceQuery(keyspace, StringSerializer.get(), TimeUUIDSerializer.get(), LongSerializer.get())
                 .setKey(sensor)
                 .setColumnFamily(toDatapointCfName(customer));
 
-        return new ColumnSliceIterator<String, UUID, String>(query, toTimeUUID(startMs), toTimeUUID(endMs), false);
+        return new ColumnSliceIterator<String, UUID, Long>(query, toTimeUUID(startMs), toTimeUUID(endMs), false);
     }
 
     public Iterator<String> sensorNameIterator(String customer, long startMs, long endMs) {

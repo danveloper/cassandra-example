@@ -40,6 +40,7 @@ public class Main {
 
         customersRepository = new CustomersRepository(cluster, keyspace);
         schedulerRepository = new RollupSchedulerRepository(cluster, keyspace);
+
         rawRepo = new DatapointRepository(cluster, keyspace, "Measurements", (int) TimeUnit.HOURS.toMillis(1));
         avgSecondRepo = new DatapointRepository(cluster, keyspace, "AverageSecond", (int) TimeUnit.HOURS.toMillis(1));
         avgFiveSecondRepo = new DatapointRepository(cluster, keyspace, "AverageFiveSeconds", (int) TimeUnit.HOURS.toMillis(1));
@@ -67,7 +68,6 @@ public class Main {
 
         String customer = "foo";
         registerCustomer(customer);
-        System.out.println("Customers: " + customersRepository.getCustomers());
 
         new GenerateMeasurementsThread(measurementQueue, customer).start();
 
@@ -76,9 +76,14 @@ public class Main {
                 try {
                     for (; ; ) {
                         Measurement measurement = measurementQueue.take();
-                        for (Map.Entry<String, String> entry : measurement.map.entrySet()) {
+                        for (Map.Entry<String, Long> entry : measurement.map.entrySet()) {
+
                             String sensor = measurement.environment + ":" + measurement.machine + ":" + measurement.subject + ":" + entry.getKey();
                             rawRepo.insert(measurement.customer, sensor, measurement.timeMs, entry.getValue());
+
+                            //todo: a new sensor name could be created but without the machine in it. So different machines will still result in the
+                            //same key. The big problem here is if multiple machines for the same 'subject' have a sensor event for the same time.
+                            //the consequence is that one will overwrite the other.
                         }
                     }
                 } catch (Throwable t) {
@@ -109,7 +114,7 @@ public class Main {
             String name = nameIt.next();
             System.out.println(name);
             int k = 1;
-            for (Map.Entry<UUID, String> result : repository.selectColumnsBetween(customer, name, startTime, endTime).entrySet()) {
+            for (Map.Entry<UUID, Long> result : repository.selectColumnsBetween(customer, name, startTime, endTime).entrySet()) {
                 UUID time = result.getKey();
                 System.out.println(k + "         time:" + time.getTime() + " value:" + result.getValue());
                 k++;
