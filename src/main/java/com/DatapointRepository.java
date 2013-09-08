@@ -52,7 +52,13 @@ public class DatapointRepository extends AbstractRepository {
 
     public void createColumnFamilies(String customer) {
         ColumnFamilyDefinition datapointColumnFamily = HFactory.createColumnFamilyDefinition(
-                keyspace.getKeyspaceName(), toDatapointCfName(customer), ComparatorType.UUIDTYPE);
+                keyspace.getKeyspaceName(), toDatapointCfName(customer));
+        //Defines how to store, compare and validate the column names
+        datapointColumnFamily.setComparatorType(ComparatorType.TIMEUUIDTYPE);
+        //Validator to use for keys
+        datapointColumnFamily.setKeyValidationClass(ComparatorType.UTF8TYPE.getClassName());
+        //Validator to use for values in columns
+        datapointColumnFamily.setDefaultValidationClass("LongType");
 
         add(datapointColumnFamily);
 
