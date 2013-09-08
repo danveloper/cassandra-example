@@ -1,0 +1,62 @@
+TODO:
+
+- aggregate function velocity
+
+- the value currently needs to be a string
+
+- failover; when a machine fails a different machines should take over the rollup.
+
+- the column-key of a rollup data should be an exact second, minute hour etc. Not the the moment the rollup was done.
+
+- embedded cassandra
+http://wiki.apache.org/cassandra/Embedding
+
+- customer isolation.
+
+- find the sensors for a given customer within a give time period.
+
+DONE
+
+- expiring old data:
+  http://www.datastax.com/dev/blog/whats-new-cassandra-07-expiring-columns
+
+- correctly implement the names
+
+- when there are many sensors within a slice, currently it is all done on a single thread.
+    - a task per rowid could solve the problem. The question is how to figure out which rowids are there.
+
+- the rollup thread always compact for a specific rowid; but it should compact for all rowids
+
+- aggregate function
+    - average
+    - maximum
+    - minimum
+
+- currently all entries for slice a pulled and memory and then they are processed, this could lead to a OOME problem. There is real need for it since one
+can iterate over it.
+
+- compacting; currently the measurements are in miliseconds.
+    - compact to seconds
+    - compact to minutes
+    - compact to hours
+    - compact to days
+    - compact to weeks
+    - compact to months
+http://www.datastax.com/dev/blog/metric-collection-and-storage-with-cassandra
+https://github.com/bshanks/cassandra-timeseries-py
+
+- pulled creation of keyspace out of the repository; multiple repositories can now share the same keyspace.
+
+- new columnfamilies are now added on the fly.
+
+- the search results are not returned sorted.
+
+- there is a problem with the initial timestamp
+
+- multi user
+
+- the source of the measurement needs to be added
+
+- currently all measurements are in a single keyspace; should there be a keyspace per user for isolation?
+http://hector-client.github.io/hector/build/html/content/virtual_keyspaces.html
+Under water it adds a prefix transparently; so the same solution I'm using.
