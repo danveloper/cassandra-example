@@ -50,6 +50,17 @@ public class DatapointRepositoryTest {
         return HFactory.createKeyspace(keyspaceDef.getName(), cluster);
     }
 
+
+    @Test
+    public void increment() {
+        long time = System.currentTimeMillis();
+        repository.insert(customer, "foo", time, 1);
+        repository.insert(customer, "foo", time, 2);
+        Long result = repository.read(customer,"foo", time);
+        assertEquals(new Long(3), result);
+    }
+
+
     @Test
     public void readExisting() {
         long time = System.currentTimeMillis();
