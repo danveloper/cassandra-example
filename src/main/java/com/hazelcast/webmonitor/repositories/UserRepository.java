@@ -1,7 +1,6 @@
-package com.repositories;
+package com.hazelcast.webmonitor.repositories;
 
-import com.User;
-import com.repositories.AbstractRepository;
+import com.hazelcast.webmonitor.model.User;
 import me.prettyprint.cassandra.serializers.StringSerializer;
 import me.prettyprint.hector.api.Cluster;
 import me.prettyprint.hector.api.Keyspace;
@@ -30,17 +29,23 @@ public class UserRepository extends AbstractRepository {
 
     public void insert(User user){
         //todo: there is a data race here.
-        if(exists(user.getLoginName())){
-            throw new IllegalArgumentException("A user with id:"+user.getLoginName()+" already exists");
+        if(exists(user.getUsername())){
+            throw new IllegalArgumentException("A user with id:"+user.getUsername()+" already exists");
         }
 
         Mutator<String> mutator = createMutator(keyspace, StringSerializer.get());
 
-        String rowId = user.getLoginName();
-        mutator.addInsertion(rowId, userColumnFamily.getName(), HFactory.createStringColumn("loginname", user.getLoginName()))
+        String rowId = user.getUsername();
+        mutator.addInsertion(rowId, userColumnFamily.getName(), HFactory.createStringColumn("username", user.getUsername()))
                 .addInsertion(rowId, userColumnFamily.getName(), HFactory.createStringColumn("password", user.getPassword()))
                 .addInsertion(rowId, userColumnFamily.getName(), HFactory.createStringColumn("email", user.getEmail()))
                 .addInsertion(rowId, userColumnFamily.getName(), HFactory.createStringColumn("company", user.getCompany()));
+        mutator.execute();
+    }
+
+    public void delete(String username){
+        Mutator<String> mutator = createMutator(keyspace, StringSerializer.get());
+        mutator.addDeletion(username, userColumnFamily.getName());
         mutator.execute();
     }
 
@@ -48,11 +53,24 @@ public class UserRepository extends AbstractRepository {
         return load(username)!=null;
     }
 
+    public User login(String username, String password){
+        User user = load(username);
+        if(user == null){
+            return null;
+        }
+
+        if(!user.getPassword().equals(password)){
+            return null;
+        }
+
+        return user;
+    }
+
     public User load(String username){
         SliceQuery<String, String,String> q = HFactory.createSliceQuery(keyspace, StringSerializer.get(), StringSerializer.get(), StringSerializer.get());
         q.setColumnFamily(userColumnFamily.getName())
                 .setKey(username)
-                .setColumnNames("loginname", "password", "email","company");
+                .setColumnNames("username", "password", "email","company");
         QueryResult<ColumnSlice<String, String>> result = q.execute();
         ColumnSlice<String, String> columnSlice = result.get();
         if(columnSlice.getColumns().isEmpty()){
@@ -60,7 +78,7 @@ public class UserRepository extends AbstractRepository {
         }
 
         User user = new User();
-        user.setLoginName(columnSlice.getColumnByName("loginname").getValue());
+        user.setUsername(columnSlice.getColumnByName("username").getValue());
         user.setPassword(columnSlice.getColumnByName("password").getValue());
         user.setEmail(columnSlice.getColumnByName("email").getValue());
         user.setCompany(columnSlice.getColumnByName("company").getValue());

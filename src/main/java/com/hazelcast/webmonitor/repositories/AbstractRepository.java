@@ -1,4 +1,4 @@
-package com.repositories;
+package com.hazelcast.webmonitor.repositories;
 
 import me.prettyprint.hector.api.Cluster;
 import me.prettyprint.hector.api.Keyspace;

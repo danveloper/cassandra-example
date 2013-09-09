@@ -1,4 +1,4 @@
-package com.repositories;
+package com.hazelcast.webmonitor.repositories;
 
 import org.junit.Before;
 import org.junit.Test;

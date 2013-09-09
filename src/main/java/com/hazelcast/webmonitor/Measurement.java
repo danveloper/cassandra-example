@@ -1,4 +1,4 @@
-package com;
+package com.hazelcast.webmonitor;
 
 import java.util.HashMap;
 import java.util.Map;

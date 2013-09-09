@@ -1,7 +1,6 @@
-package com.repositories;
+package com.hazelcast.webmonitor.repositories;
 
 import com.eaio.uuid.UUID;
-import com.repositories.AbstractRepository;
 import me.prettyprint.cassandra.serializers.CompositeSerializer;
 import me.prettyprint.cassandra.serializers.StringSerializer;
 import me.prettyprint.cassandra.serializers.TimeUUIDSerializer;

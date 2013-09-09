@@ -1,6 +1,5 @@
-package com.repositories;
+package com.hazelcast.webmonitor.repositories;
 
-import com.repositories.AbstractRepository;
 import me.prettyprint.cassandra.serializers.StringSerializer;
 import me.prettyprint.cassandra.service.ColumnSliceIterator;
 import me.prettyprint.hector.api.Cluster;
@@ -18,35 +17,35 @@ import java.util.Set;
 import static me.prettyprint.hector.api.factory.HFactory.createMutator;
 import static me.prettyprint.hector.api.factory.HFactory.createSliceQuery;
 
-public class CompanyRepository extends AbstractRepository {
+public class RollupSchedulerRepository extends AbstractRepository {
 
-    private final ColumnFamilyDefinition customerColumnFamily;
+    private final ColumnFamilyDefinition schedulerColumnFamily;
 
-    public CompanyRepository(Cluster cluster, Keyspace keyspace) {
+    public RollupSchedulerRepository(Cluster cluster, Keyspace keyspace) {
         super(cluster, keyspace);
 
-        customerColumnFamily = HFactory.createColumnFamilyDefinition(
-                keyspace.getKeyspaceName(), "Customer", ComparatorType.UTF8TYPE);
+        schedulerColumnFamily = HFactory.createColumnFamilyDefinition(
+                keyspace.getKeyspaceName(), "RollupSchedulerRepository", ComparatorType.UTF8TYPE);
 
-        add(customerColumnFamily);
+        add(schedulerColumnFamily);
     }
 
-    public void save(String companyName) {
+    public void save(String customer) {
         //inserts the sensor value
         Mutator<String> customerMutator = createMutator(keyspace, StringSerializer.get());
         HColumn<String, String> customerColumn = HFactory.createColumn(
-                companyName,
-                companyName,
+                customer,
+                customer,
                 StringSerializer.get(),
                 StringSerializer.get());
-        customerMutator.addInsertion("foo", customerColumnFamily.getName(), customerColumn);
+        customerMutator.addInsertion("foo", schedulerColumnFamily.getName(), customerColumn);
         customerMutator.execute();
     }
 
-    public Set<String> getCompanyNames() {
+    public Set<String> getCustomers() {
         SliceQuery<String, String, String> query = createSliceQuery(keyspace, StringSerializer.get(), StringSerializer.get(), StringSerializer.get())
                 .setKey("foo")
-                .setColumnFamily(customerColumnFamily.getName());
+                .setColumnFamily(schedulerColumnFamily.getName());
         String endString = Character.toString(Character.MAX_VALUE);
 
         ColumnSliceIterator<String, String, String> iterator =

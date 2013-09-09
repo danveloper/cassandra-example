@@ -1,9 +1,9 @@
-package com;
+package com.hazelcast.webmonitor;
 
-import com.aggregatefunctions.AggregateFunctionFactory;
-import com.repositories.CompanyRepository;
-import com.repositories.DatapointRepository;
-import com.repositories.RollupSchedulerRepository;
+import com.hazelcast.webmonitor.aggregatefunctions.AggregateFunctionFactory;
+import com.hazelcast.webmonitor.repositories.CompanyRepository;
+import com.hazelcast.webmonitor.repositories.DatapointRepository;
+import com.hazelcast.webmonitor.repositories.RollupSchedulerRepository;
 
 import java.util.concurrent.*;
 

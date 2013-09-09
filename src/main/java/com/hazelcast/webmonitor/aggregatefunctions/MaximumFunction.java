@@ -1,4 +1,4 @@
-package com.aggregatefunctions;
+package com.hazelcast.webmonitor.aggregatefunctions;
 
 public class MaximumFunction implements AggregateFunction {
 

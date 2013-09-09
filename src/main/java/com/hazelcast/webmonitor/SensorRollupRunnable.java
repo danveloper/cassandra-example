@@ -1,8 +1,8 @@
-package com;
+package com.hazelcast.webmonitor;
 
-import com.aggregatefunctions.AggregateFunction;
+import com.hazelcast.webmonitor.aggregatefunctions.AggregateFunction;
 import com.eaio.uuid.UUID;
-import com.repositories.DatapointRepository;
+import com.hazelcast.webmonitor.repositories.DatapointRepository;
 import me.prettyprint.hector.api.beans.HCounterColumn;
 import org.apache.log4j.Logger;
 

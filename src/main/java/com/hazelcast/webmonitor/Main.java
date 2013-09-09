@@ -1,13 +1,13 @@
-package com;
+package com.hazelcast.webmonitor;
 
-import com.aggregatefunctions.AggregateFunctionFactory;
-import com.aggregatefunctions.AverageFunction;
-import com.aggregatefunctions.MaximumFunction;
-import com.aggregatefunctions.SumFunction;
+import com.hazelcast.webmonitor.aggregatefunctions.AggregateFunctionFactory;
+import com.hazelcast.webmonitor.aggregatefunctions.AverageFunction;
+import com.hazelcast.webmonitor.aggregatefunctions.MaximumFunction;
+import com.hazelcast.webmonitor.aggregatefunctions.SumFunction;
 import com.eaio.uuid.UUID;
-import com.repositories.CompanyRepository;
-import com.repositories.DatapointRepository;
-import com.repositories.RollupSchedulerRepository;
+import com.hazelcast.webmonitor.repositories.CompanyRepository;
+import com.hazelcast.webmonitor.repositories.DatapointRepository;
+import com.hazelcast.webmonitor.repositories.RollupSchedulerRepository;
 import me.prettyprint.cassandra.service.ThriftKsDef;
 import me.prettyprint.hector.api.Cluster;
 import me.prettyprint.hector.api.Keyspace;

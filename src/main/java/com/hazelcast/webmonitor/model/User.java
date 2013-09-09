@@ -1,13 +1,11 @@
-package com;
+package com.hazelcast.webmonitor.model;
 
 public class User {
 
     private String email;
-    private String loginName;
+    private String username;
     private String password;
     private String company;
-
-
 
     public String getEmail() {
         return email;
@@ -17,12 +15,12 @@ public class User {
         this.email = email;
     }
 
-    public String getLoginName() {
-        return loginName;
+    public String getUsername() {
+        return username;
     }
 
-    public void setLoginName(String loginName) {
-        this.loginName = loginName;
+    public void setUsername(String username) {
+        this.username = username;
     }
 
     public String getPassword() {
@@ -45,7 +43,7 @@ public class User {
     public String toString() {
         return "User{" +
                 "email='" + email + '\'' +
-                ", loginName='" + loginName + '\'' +
+                ", username='" + username + '\'' +
                 ", password='" + password + '\'' +
                 ", company='" + company + '\'' +
                 '}';
@@ -60,7 +58,7 @@ public class User {
 
         if (company != null ? !company.equals(user.company) : user.company != null) return false;
         if (email != null ? !email.equals(user.email) : user.email != null) return false;
-        if (loginName != null ? !loginName.equals(user.loginName) : user.loginName != null) return false;
+        if (username != null ? !username.equals(user.username) : user.username != null) return false;
         if (password != null ? !password.equals(user.password) : user.password != null) return false;
 
         return true;
@@ -69,7 +67,7 @@ public class User {
     @Override
     public int hashCode() {
         int result = email != null ? email.hashCode() : 0;
-        result = 31 * result + (loginName != null ? loginName.hashCode() : 0);
+        result = 31 * result + (username != null ? username.hashCode() : 0);
         result = 31 * result + (password != null ? password.hashCode() : 0);
         result = 31 * result + (company != null ? company.hashCode() : 0);
         return result;

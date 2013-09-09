@@ -1,11 +1,10 @@
-package com.repositories;
+package com.hazelcast.webmonitor.repositories;
 
 import me.prettyprint.hector.api.Cluster;
 import me.prettyprint.hector.api.Keyspace;
 import me.prettyprint.hector.api.ddl.KeyspaceDefinition;
 import me.prettyprint.hector.api.factory.HFactory;
 import org.junit.After;
-import org.junit.Before;
 
 import java.util.UUID;
 
