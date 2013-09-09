@@ -18,7 +18,13 @@ TODO:
   or if there are 2 measuring point of 2 machines. If the machine name could be added as meta data to the column,
   then this distinction could be made.
 
+- atomic way to create a user with a given loginname
+
+- control number of machine to be monitored for free users.
+
 DONE
+
+- normal user database
 
 - embedded cassandra
 http://wiki.apache.org/cassandra/Embedding

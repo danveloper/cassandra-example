@@ -1,4 +1,4 @@
-package com;
+package com.repositories;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -10,12 +10,12 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 public class CustomerRepositoryTest extends AbstractRepositoryTest {
-    private CustomersRepository customerRepository;
+    private CompanyRepository customerRepository;
 
     @Before
     public void setUp(){
         super.setUp();
-        customerRepository = new CustomersRepository(cluster,keyspace);
+        customerRepository = new CompanyRepository(cluster,keyspace);
     }
 
     @Test
@@ -26,7 +26,7 @@ public class CustomerRepositoryTest extends AbstractRepositoryTest {
 
     @Test
     public void getCustomers_WhenEmpty(){
-        Set<String> result = customerRepository.getCustomers();
+        Set<String> result = customerRepository.getCompanyNames();
         assertNotNull(result);
         assertTrue(result.isEmpty());
     }
@@ -36,7 +36,7 @@ public class CustomerRepositoryTest extends AbstractRepositoryTest {
         customerRepository.save("foo");
         customerRepository.save("bar");
 
-        Set<String> result = customerRepository.getCustomers();
+        Set<String> result = customerRepository.getCompanyNames();
         assertNotNull(result);
         assertEquals(2,result.size());
         assertTrue(result.contains("foo"));

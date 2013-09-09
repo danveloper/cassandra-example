@@ -5,7 +5,9 @@ import com.aggregatefunctions.AverageFunction;
 import com.aggregatefunctions.MaximumFunction;
 import com.aggregatefunctions.SumFunction;
 import com.eaio.uuid.UUID;
-import com.google.common.collect.Table;
+import com.repositories.CompanyRepository;
+import com.repositories.DatapointRepository;
+import com.repositories.RollupSchedulerRepository;
 import me.prettyprint.cassandra.service.ThriftKsDef;
 import me.prettyprint.hector.api.Cluster;
 import me.prettyprint.hector.api.Keyspace;
@@ -27,7 +29,7 @@ public class Main {
 
     private final Cluster cluster;
     private final Keyspace keyspace;
-    private final CustomersRepository customersRepository;
+    private final CompanyRepository companyRepository;
     private final DatapointRepository rawRepo;
     private final DatapointRepository avgSecondRepo;
     private final DatapointRepository avgFiveSecondRepo;
@@ -39,12 +41,12 @@ public class Main {
     private final DatapointRepository rawRepo2;
 
     public Main() {
-        startCassandra();
+        //startCassandra();
 
         cluster = HFactory.getOrCreateCluster("test-cluster", "localhost:9175");
         keyspace = createKeyspace(cluster, "Measurements");
 
-        customersRepository = new CustomersRepository(cluster, keyspace);
+        companyRepository = new CompanyRepository(cluster, keyspace);
         schedulerRepository = new RollupSchedulerRepository(cluster, keyspace);
 
         rawRepo = new DatapointRepository(cluster, keyspace, "Measurements", (int) TimeUnit.HOURS.toMillis(1));
@@ -55,7 +57,7 @@ public class Main {
         avg30SecondRepo = new DatapointRepository(cluster, keyspace, "Average30Seconds", (int) TimeUnit.HOURS.toMillis(1));
         maxFiveSecondRepo = new DatapointRepository(cluster, keyspace, "MaxFiveSeconds", (int) TimeUnit.HOURS.toMillis(1));
 
-        scheduler = new RollupScheduler(schedulerRepository, customersRepository);
+        scheduler = new RollupScheduler(schedulerRepository, companyRepository);
         scheduler.schedule(rawRepo, avgSecondRepo, new AggregateFunctionFactory(AverageFunction.class), 1000);
         scheduler.schedule(rawRepo2, avgSecondRepo, new AggregateFunctionFactory(SumFunction.class), 1000);
         scheduler.schedule(avgSecondRepo, avgFiveSecondRepo, new AggregateFunctionFactory(AverageFunction.class), 5000);
@@ -78,7 +80,7 @@ public class Main {
         avg30SecondRepo.createColumnFamilies(customer);
         maxFiveSecondRepo.createColumnFamilies(customer);
         rawRepo2.createColumnFamilies(customer);
-        customersRepository.save(customer);
+        companyRepository.save(customer);
     }
 
     public void start() throws InterruptedException {

@@ -2,8 +2,7 @@ package com;
 
 import com.aggregatefunctions.AggregateFunction;
 import com.eaio.uuid.UUID;
-import me.prettyprint.cassandra.service.ColumnSliceIterator;
-import me.prettyprint.hector.api.beans.HColumn;
+import com.repositories.DatapointRepository;
 import me.prettyprint.hector.api.beans.HCounterColumn;
 import org.apache.log4j.Logger;
 

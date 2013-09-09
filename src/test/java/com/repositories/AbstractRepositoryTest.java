@@ -1,4 +1,4 @@
-package com;
+package com.repositories;
 
 import me.prettyprint.hector.api.Cluster;
 import me.prettyprint.hector.api.Keyspace;

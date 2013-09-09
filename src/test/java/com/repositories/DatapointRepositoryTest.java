@@ -1,5 +1,6 @@
-package com;
+package com.repositories;
 
+import com.repositories.DatapointRepository;
 import me.prettyprint.hector.api.Cluster;
 import me.prettyprint.hector.api.Keyspace;
 import me.prettyprint.hector.api.ddl.KeyspaceDefinition;
