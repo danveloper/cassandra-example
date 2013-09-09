@@ -3,13 +3,16 @@ package com;
 import com.aggregatefunctions.AggregateFunctionFactory;
 import com.aggregatefunctions.AverageFunction;
 import com.aggregatefunctions.MaximumFunction;
+import com.aggregatefunctions.SumFunction;
 import com.eaio.uuid.UUID;
+import com.google.common.collect.Table;
 import me.prettyprint.cassandra.service.ThriftKsDef;
 import me.prettyprint.hector.api.Cluster;
 import me.prettyprint.hector.api.Keyspace;
 import me.prettyprint.hector.api.ddl.ColumnFamilyDefinition;
 import me.prettyprint.hector.api.ddl.KeyspaceDefinition;
 import me.prettyprint.hector.api.factory.HFactory;
+import org.apache.cassandra.service.CassandraDaemon;
 import org.apache.log4j.Logger;
 
 import java.util.Iterator;
@@ -33,15 +36,20 @@ public class Main {
     private final RollupScheduler scheduler;
     private final RollupSchedulerRepository schedulerRepository;
     private final BlockingQueue<Measurement> measurementQueue = new LinkedBlockingQueue<Measurement>();
+    private final DatapointRepository rawRepo2;
 
     public Main() {
-        cluster = HFactory.getOrCreateCluster("test-cluster", "localhost:9160");
+        startCassandra();
+
+        cluster = HFactory.getOrCreateCluster("test-cluster", "localhost:9175");
         keyspace = createKeyspace(cluster, "Measurements");
 
         customersRepository = new CustomersRepository(cluster, keyspace);
         schedulerRepository = new RollupSchedulerRepository(cluster, keyspace);
 
         rawRepo = new DatapointRepository(cluster, keyspace, "Measurements", (int) TimeUnit.HOURS.toMillis(1));
+        rawRepo2 = new DatapointRepository(cluster, keyspace, "raw2", (int) TimeUnit.HOURS.toMillis(1));
+
         avgSecondRepo = new DatapointRepository(cluster, keyspace, "AverageSecond", (int) TimeUnit.HOURS.toMillis(1));
         avgFiveSecondRepo = new DatapointRepository(cluster, keyspace, "AverageFiveSeconds", (int) TimeUnit.HOURS.toMillis(1));
         avg30SecondRepo = new DatapointRepository(cluster, keyspace, "Average30Seconds", (int) TimeUnit.HOURS.toMillis(1));
@@ -49,9 +57,18 @@ public class Main {
 
         scheduler = new RollupScheduler(schedulerRepository, customersRepository);
         scheduler.schedule(rawRepo, avgSecondRepo, new AggregateFunctionFactory(AverageFunction.class), 1000);
+        scheduler.schedule(rawRepo2, avgSecondRepo, new AggregateFunctionFactory(SumFunction.class), 1000);
         scheduler.schedule(avgSecondRepo, avgFiveSecondRepo, new AggregateFunctionFactory(AverageFunction.class), 5000);
         scheduler.schedule(avgFiveSecondRepo, avg30SecondRepo, new AggregateFunctionFactory(AverageFunction.class), 30000);
         scheduler.schedule(avgSecondRepo, maxFiveSecondRepo, new AggregateFunctionFactory(MaximumFunction.class), 5000);
+    }
+
+    public static void startCassandra(){
+        System.setProperty("cassandra.config", "file:/java/projects/junk/cassandra-example/cassandra.yaml");
+        System.setProperty("cassandra-foreground", "true");
+
+        CassandraDaemon cassandraDaemon = new CassandraDaemon();
+        cassandraDaemon.activate();
     }
 
     public void registerCustomer(String customer) {
@@ -60,6 +77,7 @@ public class Main {
         avgFiveSecondRepo.createColumnFamilies(customer);
         avg30SecondRepo.createColumnFamilies(customer);
         maxFiveSecondRepo.createColumnFamilies(customer);
+        rawRepo2.createColumnFamilies(customer);
         customersRepository.save(customer);
     }
 
@@ -78,12 +96,11 @@ public class Main {
                         Measurement measurement = measurementQueue.take();
                         for (Map.Entry<String, Long> entry : measurement.map.entrySet()) {
 
-                            String sensor = measurement.environment + ":" + measurement.machine + ":" + measurement.subject + ":" + entry.getKey();
-                            rawRepo.insert(measurement.customer, sensor, measurement.timeMs, entry.getValue());
+                            String sensorPerMachine = measurement.environment + ":" + measurement.machine + ":" + measurement.subject + ":" + entry.getKey();
+                            rawRepo.insert(measurement.customer, sensorPerMachine, measurement.timeMs, entry.getValue());
 
-                            //todo: a new sensor name could be created but without the machine in it. So different machines will still result in the
-                            //same key. The big problem here is if multiple machines for the same 'subject' have a sensor event for the same time.
-                            //the consequence is that one will overwrite the other.
+                            String sensorPerEnv = measurement.environment + ":" + measurement.subject + ":" + entry.getKey();
+                            rawRepo2.insert(measurement.customer, sensorPerEnv, measurement.timeMs, entry.getValue());
                         }
                     }
                 } catch (Throwable t) {
@@ -92,7 +109,7 @@ public class Main {
             }
         }.start();
 
-        Thread.sleep(10000);
+        Thread.sleep(30000);
 
         long endTime = System.currentTimeMillis();
 

@@ -5,13 +5,11 @@ import java.util.concurrent.BlockingQueue;
 
 public class GenerateMeasurementsThread extends Thread {
 
-    private final String[] clusters = new String[]{"dev", "staging", "prod"};
+    private final String[] clusters = new String[]{"dev"};
     private final String[][] machines = new String[][]{
-            new String[]{"192.168.1.1:5701", "192.168.1.1:5702", "192.168.1.1:5703"},
-            new String[]{"192.168.2.1:5701", "192.168.2.2:5701", "192.168.2.3:5701"},
-            new String[]{"192.168.3.1:5701", "192.168.3.1:5701", "192.168.3.2:5701"}};
+            new String[]{"192.168.1.1:5701","192.168.1.2:5701"}};
 
-    private final String[] maps = new String[]{"map1", "map2"};
+    private final String[] maps = new String[]{"map1"};
     private final long[] readCounters = new long[maps.length];
     private final long[] writeCounters = new long[maps.length];
     private final BlockingQueue<Measurement> measurementQueue;
@@ -57,7 +55,7 @@ public class GenerateMeasurementsThread extends Thread {
         writeCounters[mapIndex] = writeCount;
 
         measurement.map.put("readCount", readCount);
-        measurement.map.put("writeCount",writeCount);
+        //measurement.map.put("writeCount",writeCount);
         return measurement;
     }
 }

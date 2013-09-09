@@ -11,17 +11,19 @@ TODO:
 
 - the column-key of a rollup data should be an exact second, minute hour etc. Not the the moment the rollup was done.
 
+- a keyspace per customer?
+
+- merging different maps
+  - the problem is that it isn't clear if there are 2 measuring points of the same machine (since there is no ip)
+  or if there are 2 measuring point of 2 machines. If the machine name could be added as meta data to the column,
+  then this distinction could be made.
+
+DONE
+
 - embedded cassandra
 http://wiki.apache.org/cassandra/Embedding
 
 - aggregate from multiple machines, same cluster, for the same 'distributed object'.
-
-- tables per environment?
-    - an additional set of tables could be created. Where
-
-- a keyspace per customer?
-
-DONE
 
 - type of the value column for the measurement is changed to long; needed for counter
 

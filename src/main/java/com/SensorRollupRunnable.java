@@ -42,11 +42,16 @@ public class SensorRollupRunnable implements Runnable {
 
             Iterator<HCounterColumn<UUID>> iterator = source.dataPointIterator(customer, sensor, startMs, endMs);
 
+            int count = 0;
             for (; iterator.hasNext(); ) {
                 HCounterColumn<UUID> columns = iterator.next();
                 long value = columns.getValue();
                 function.feed(value);
+                count++;
             }
+
+            logger.info("compressed "+sensor+" count:"+count);
+
 
             target.insert(customer, sensor, startMs,  function.result());
         } catch (Throwable e) {
