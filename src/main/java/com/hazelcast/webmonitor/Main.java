@@ -1,13 +1,13 @@
 package com.hazelcast.webmonitor;
 
-import com.hazelcast.webmonitor.aggregatefunctions.AggregateFunctionFactory;
-import com.hazelcast.webmonitor.aggregatefunctions.AverageFunction;
-import com.hazelcast.webmonitor.aggregatefunctions.MaximumFunction;
-import com.hazelcast.webmonitor.aggregatefunctions.SumFunction;
 import com.eaio.uuid.UUID;
 import com.hazelcast.webmonitor.repositories.CompanyRepository;
 import com.hazelcast.webmonitor.repositories.DatapointRepository;
 import com.hazelcast.webmonitor.repositories.RollupSchedulerRepository;
+import com.hazelcast.webmonitor.scheduler.AvgRollupRunnable;
+import com.hazelcast.webmonitor.scheduler.CompactRollupRunnable;
+import com.hazelcast.webmonitor.scheduler.RollupRunnable;
+import com.hazelcast.webmonitor.scheduler.RollupScheduler;
 import me.prettyprint.cassandra.service.ThriftKsDef;
 import me.prettyprint.hector.api.Cluster;
 import me.prettyprint.hector.api.Keyspace;
@@ -34,38 +34,38 @@ public class Main {
     private final DatapointRepository avgSecondRepo;
     private final DatapointRepository avgFiveSecondRepo;
     private final DatapointRepository avg30SecondRepo;
-    private final DatapointRepository maxFiveSecondRepo;
     private final RollupScheduler scheduler;
     private final RollupSchedulerRepository schedulerRepository;
     private final BlockingQueue<Measurement> measurementQueue = new LinkedBlockingQueue<Measurement>();
-    private final DatapointRepository rawRepo2;
+    private final DatapointRepository compactedSecondRepo;
 
     public Main() {
         //startCassandra();
 
-        cluster = HFactory.getOrCreateCluster("test-cluster", "localhost:9175");
+        cluster = HFactory.getOrCreateCluster("test-cluster", "localhost:9160");
         keyspace = createKeyspace(cluster, "Measurements");
 
         companyRepository = new CompanyRepository(cluster, keyspace);
         schedulerRepository = new RollupSchedulerRepository(cluster, keyspace);
 
         rawRepo = new DatapointRepository(cluster, keyspace, "Measurements", (int) TimeUnit.HOURS.toMillis(1));
-        rawRepo2 = new DatapointRepository(cluster, keyspace, "raw2", (int) TimeUnit.HOURS.toMillis(1));
 
         avgSecondRepo = new DatapointRepository(cluster, keyspace, "AverageSecond", (int) TimeUnit.HOURS.toMillis(1));
+        compactedSecondRepo = new DatapointRepository(cluster, keyspace, "Compacted", (int) TimeUnit.HOURS.toMillis(1));
+
         avgFiveSecondRepo = new DatapointRepository(cluster, keyspace, "AverageFiveSeconds", (int) TimeUnit.HOURS.toMillis(1));
         avg30SecondRepo = new DatapointRepository(cluster, keyspace, "Average30Seconds", (int) TimeUnit.HOURS.toMillis(1));
-        maxFiveSecondRepo = new DatapointRepository(cluster, keyspace, "MaxFiveSeconds", (int) TimeUnit.HOURS.toMillis(1));
 
         scheduler = new RollupScheduler(schedulerRepository, companyRepository);
-        scheduler.schedule(rawRepo, avgSecondRepo, new AggregateFunctionFactory(AverageFunction.class), 1000);
-        scheduler.schedule(rawRepo2, avgSecondRepo, new AggregateFunctionFactory(SumFunction.class), 1000);
-        scheduler.schedule(avgSecondRepo, avgFiveSecondRepo, new AggregateFunctionFactory(AverageFunction.class), 5000);
-        scheduler.schedule(avgFiveSecondRepo, avg30SecondRepo, new AggregateFunctionFactory(AverageFunction.class), 30000);
-        scheduler.schedule(avgSecondRepo, maxFiveSecondRepo, new AggregateFunctionFactory(MaximumFunction.class), 5000);
+        //  scheduler.schedule(rawRepo, avgSecondRepo, AvgRollupRunnable.class, 1000);
+        scheduler.schedule(rawRepo, avgSecondRepo, AvgRollupRunnable.class, 1000);
+        scheduler.schedule(rawRepo, avgSecondRepo, CompactRollupRunnable.class, 1000);
+      //  scheduler.schedule(rawRepo2, avgSecondRepo, AvgRollupRunnable.class, 1000);
+         scheduler.schedule(avgSecondRepo, avgFiveSecondRepo, AvgRollupRunnable.class, 5000);
+          scheduler.schedule(avgFiveSecondRepo, avg30SecondRepo, AvgRollupRunnable.class, 30000);
     }
 
-    public static void startCassandra(){
+    public static void startCassandra() {
         System.setProperty("cassandra.config", "file:/java/projects/junk/cassandra-example/cassandra.yaml");
         System.setProperty("cassandra-foreground", "true");
 
@@ -73,23 +73,24 @@ public class Main {
         cassandraDaemon.activate();
     }
 
-    public void registerCustomer(String customer) {
-        rawRepo.createColumnFamilies(customer);
-        avgSecondRepo.createColumnFamilies(customer);
-        avgFiveSecondRepo.createColumnFamilies(customer);
-        avg30SecondRepo.createColumnFamilies(customer);
-        maxFiveSecondRepo.createColumnFamilies(customer);
-        rawRepo2.createColumnFamilies(customer);
-        companyRepository.save(customer);
+    public void registerCustomer(String company) {
+        rawRepo.createColumnFamilies(company);
+        avgSecondRepo.createColumnFamilies(company);
+        avgFiveSecondRepo.createColumnFamilies(company);
+        avg30SecondRepo.createColumnFamilies(company);
+        compactedSecondRepo.createColumnFamilies(company);
+        System.out.println("Companies before insert: "+companyRepository.getCompanyNames());
+        companyRepository.save(company);
+        System.out.println("Companies after insert: "+companyRepository.getCompanyNames());
     }
 
     public void start() throws InterruptedException {
         long startTime = System.currentTimeMillis();
 
-        String customer = "foo";
-        registerCustomer(customer);
+        String company = "hazelcast";
+        registerCustomer(company);
 
-        new GenerateMeasurementsThread(measurementQueue, customer).start();
+        new GenerateMeasurementsThread(measurementQueue, company).start();
 
         new Thread() {
             public void run() {
@@ -98,11 +99,8 @@ public class Main {
                         Measurement measurement = measurementQueue.take();
                         for (Map.Entry<String, Long> entry : measurement.map.entrySet()) {
 
-                            String sensorPerMachine = measurement.environment + ":" + measurement.machine + ":" + measurement.subject + ":" + entry.getKey();
+                            String sensorPerMachine = measurement.environment + "!" + measurement.machine + "!" + measurement.subject + "!" + entry.getKey();
                             rawRepo.insert(measurement.customer, sensorPerMachine, measurement.timeMs, entry.getValue());
-
-                            String sensorPerEnv = measurement.environment + ":" + measurement.subject + ":" + entry.getKey();
-                            rawRepo2.insert(measurement.customer, sensorPerEnv, measurement.timeMs, entry.getValue());
                         }
                     }
                 } catch (Throwable t) {
@@ -111,12 +109,11 @@ public class Main {
             }
         }.start();
 
-        Thread.sleep(30000);
+        Thread.sleep(20000);
 
         long endTime = System.currentTimeMillis();
 
-        System.out.println("avg 5 seconds:");
-        print(avgFiveSecondRepo, customer, startTime, endTime);
+        print("avg 5 seconds",avgFiveSecondRepo, company, startTime, endTime);
 
         System.out.println("finished");
         System.exit(0);
@@ -128,7 +125,10 @@ public class Main {
         main.start();
     }
 
-    private static void print(DatapointRepository repository, String customer, long startTime, long endTime) {
+    private static void print(String desc, DatapointRepository repository, String customer, long startTime, long endTime) {
+        System.out.println(desc);
+
+
         for (Iterator<String> nameIt = repository.sensorNameIterator(customer, startTime, endTime); nameIt.hasNext(); ) {
             String name = nameIt.next();
             System.out.println(name);
@@ -143,15 +143,17 @@ public class Main {
 
     private static Keyspace createKeyspace(Cluster cluster, String keyspaceName) {
         KeyspaceDefinition keyspaceDef = cluster.describeKeyspace(keyspaceName);
-        if (keyspaceDef == null) {
-            keyspaceDef = HFactory.createKeyspaceDefinition(
-                    keyspaceName,
-                    ThriftKsDef.DEF_STRATEGY_CLASS,
-                    1,
-                    new LinkedList<ColumnFamilyDefinition>());
-
-            cluster.addKeyspace(keyspaceDef, true);
+        if (keyspaceDef != null) {
+            cluster.dropKeyspace(keyspaceName);
         }
+
+        keyspaceDef = HFactory.createKeyspaceDefinition(
+                keyspaceName,
+                ThriftKsDef.DEF_STRATEGY_CLASS,
+                1,
+                new LinkedList<ColumnFamilyDefinition>());
+
+        cluster.addKeyspace(keyspaceDef, true);
 
         return HFactory.createKeyspace(keyspaceDef.getName(), cluster);
     }

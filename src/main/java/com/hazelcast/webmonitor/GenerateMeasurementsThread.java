@@ -26,7 +26,7 @@ public class GenerateMeasurementsThread extends Thread {
 
         for (; ; ) {
             try {
-                Thread.sleep(random.nextInt(10));
+                Thread.sleep(random.nextInt(200));
             } catch (InterruptedException e) {
             }
 

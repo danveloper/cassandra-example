@@ -1,5 +1,38 @@
 TODO:
 
+- use company/project as unique
+
+- maybe the whole sensorrolluprunnable should be the variable part for calulcation.
+  so by creating different implementations of this class instead of through aggregatefunctions.
+  and even this class is very limited since it will expect only data from a single sensor feed
+  and is not able to combine from different sensor feeds.
+
+- aggregate on members of the cluster
+    - you want to have a total of machine operations within a cluster.
+    input:
+        key:{cluster,machine,topic}
+        column:time
+        value:count
+    output:
+        key:{cluster,machine}
+        column:time
+        value:count
+- aggregate on datastructures
+    - you want to have a total of map operations within a cluster.
+      input:
+            key:{cluster,machine,topic}
+            column:time
+            value:count
+        output:
+            key:{cluster,topic}
+            column:time
+            value:count
+
+- with the aggregation you ask for all keys within a time period for a given environment.
+    - this will contains different
+
+- the sensor name should be a composed key so that the original information is not lost.
+
 - improved scheduling of rollers
     - a roller for minutes, is now allowed to overtake the roller of seconds.
     - the scheduling mechanism is not distributed

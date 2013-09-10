@@ -8,6 +8,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 
 public class WarningMessageRepositoryTest extends AbstractRepositoryTest {
+
     private WarningMessageRepository warningMessageRepository;
 
     @Before
@@ -18,16 +19,16 @@ public class WarningMessageRepositoryTest extends AbstractRepositoryTest {
 
     @Test
     public void get_nonExisting() {
-        WarningMessage warningMessage = warningMessageRepository.get("non existing","foo");
+        WarningMessage warningMessage = warningMessageRepository.get("hazelcast","non existing","foo");
         assertNull(warningMessage);
     }
 
     @Test
     public void save(){
-        WarningMessage warningMessage = new WarningMessage("date","somemessage","dev");
+        WarningMessage warningMessage = new WarningMessage("hazelcast","date","somemessage","dev");
 
         warningMessageRepository.save(warningMessage);
-        WarningMessage found = warningMessageRepository.get(warningMessage.getClusterName(), warningMessage.getDate());
+        WarningMessage found = warningMessageRepository.get(warningMessage.getCompany(),warningMessage.getClusterName(), warningMessage.getDate());
         assertEquals(warningMessage,found);
     }
 }

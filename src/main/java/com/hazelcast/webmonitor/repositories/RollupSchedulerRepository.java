@@ -46,10 +46,12 @@ public class RollupSchedulerRepository extends AbstractRepository {
         SliceQuery<String, String, String> query = createSliceQuery(keyspace, StringSerializer.get(), StringSerializer.get(), StringSerializer.get())
                 .setKey("foo")
                 .setColumnFamily(schedulerColumnFamily.getName());
+        String beginString = Character.toString(Character.MIN_VALUE);
+
         String endString = Character.toString(Character.MAX_VALUE);
 
         ColumnSliceIterator<String, String, String> iterator =
-                new ColumnSliceIterator<String, String, String>(query, "a", endString, false);
+                new ColumnSliceIterator<String, String, String>(query, beginString, endString, false);
 
         HashSet<String> result = new HashSet<String>();
         while (iterator.hasNext()) {

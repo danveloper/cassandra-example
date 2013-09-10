@@ -27,17 +27,17 @@ public class WarningMessageRepository extends AbstractRepository {
         add(warningMessageColumnFamily);
     }
 
-    public void delete(String key) {
+    public void delete(String company, String clusterName, String date) {
         Mutator<String> mutator = createMutator(keyspace, StringSerializer.get());
-        mutator.addDeletion(key, warningMessageColumnFamily.getName());
+        mutator.addDeletion(company+":"+clusterName+":"+date, warningMessageColumnFamily.getName());
         mutator.execute();
     }
 
-    public WarningMessage get(String clusterName, String date) {
+    public WarningMessage get(String company, String clusterName, String date) {
         SliceQuery<String, String, String> q = HFactory.createSliceQuery(keyspace, StringSerializer.get(), StringSerializer.get(), StringSerializer.get());
         q.setColumnFamily(warningMessageColumnFamily.getName())
-                .setKey(clusterName+":"+date)
-                .setColumnNames("message", "cluster", "date");
+                .setKey(company+":"+clusterName+":"+date)
+                .setColumnNames("company","message", "cluster", "date");
         QueryResult<ColumnSlice<String, String>> result = q.execute();
         ColumnSlice<String, String> columnSlice = result.get();
         if (columnSlice.getColumns().isEmpty()) {
@@ -45,17 +45,20 @@ public class WarningMessageRepository extends AbstractRepository {
         }
 
         return new WarningMessage(
+                columnSlice.getColumnByName("company").getValue(),
                 columnSlice.getColumnByName("date").getValue(),
                 columnSlice.getColumnByName("message").getValue(),
                 columnSlice.getColumnByName("cluster").getValue()
         );
     }
 
+    //the problem here is that multiple warningmessages for the same company/cluster/date can lead to lost warningmessages
     public void save(WarningMessage alert) {
         Mutator<String> mutator = createMutator(keyspace, StringSerializer.get());
 
-        String rowId = alert.getClusterName() + ":" + alert.getDate();
+        String rowId = alert.getCompany()+":"+alert.getClusterName() + ":" + alert.getDate();
         mutator.addInsertion(rowId, warningMessageColumnFamily.getName(), HFactory.createStringColumn("message", alert.getMessage()))
+                .addInsertion(rowId, warningMessageColumnFamily.getName(), HFactory.createStringColumn("company", alert.getCompany()))
                 .addInsertion(rowId, warningMessageColumnFamily.getName(), HFactory.createStringColumn("cluster", alert.getClusterName()))
                 .addInsertion(rowId, warningMessageColumnFamily.getName(), HFactory.createStringColumn("date", alert.getDate()));
         mutator.execute();

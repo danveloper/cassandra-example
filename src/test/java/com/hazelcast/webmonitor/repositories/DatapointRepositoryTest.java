@@ -50,7 +50,6 @@ public class DatapointRepositoryTest {
         return HFactory.createKeyspace(keyspaceDef.getName(), cluster);
     }
 
-
     @Test
     public void increment() {
         long time = System.currentTimeMillis();

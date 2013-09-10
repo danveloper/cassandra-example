@@ -25,31 +25,32 @@ public class CompanyRepository extends AbstractRepository {
         super(cluster, keyspace);
 
         customerColumnFamily = HFactory.createColumnFamilyDefinition(
-                keyspace.getKeyspaceName(), "Customer", ComparatorType.UTF8TYPE);
+                keyspace.getKeyspaceName(), "company", ComparatorType.UTF8TYPE);
 
         add(customerColumnFamily);
     }
 
     public void save(String companyName) {
-        //inserts the sensor value
-        Mutator<String> customerMutator = createMutator(keyspace, StringSerializer.get());
+         Mutator<String> mutator = createMutator(keyspace, StringSerializer.get());
         HColumn<String, String> customerColumn = HFactory.createColumn(
                 companyName,
                 companyName,
                 StringSerializer.get(),
                 StringSerializer.get());
-        customerMutator.addInsertion("foo", customerColumnFamily.getName(), customerColumn);
-        customerMutator.execute();
+        mutator.addInsertion("foo", customerColumnFamily.getName(), customerColumn);
+        mutator.execute();
     }
 
     public Set<String> getCompanyNames() {
         SliceQuery<String, String, String> query = createSliceQuery(keyspace, StringSerializer.get(), StringSerializer.get(), StringSerializer.get())
                 .setKey("foo")
                 .setColumnFamily(customerColumnFamily.getName());
-        String endString = Character.toString(Character.MAX_VALUE);
+
+        String begin = Character.toString(Character.MIN_VALUE);
+        String end = Character.toString(Character.MAX_VALUE);
 
         ColumnSliceIterator<String, String, String> iterator =
-                new ColumnSliceIterator<String, String, String>(query, "a", endString, false);
+                new ColumnSliceIterator<String, String, String>(query, begin, end, false);
 
         HashSet<String> result = new HashSet<String>();
         while (iterator.hasNext()) {
