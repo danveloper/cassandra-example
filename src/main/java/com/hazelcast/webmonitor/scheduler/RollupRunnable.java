@@ -62,7 +62,7 @@ public class RollupRunnable implements Runnable {
                 }
             }
 
-            System.out.println("Finished compacting " + description + " sensors:" + futures.size());
+            System.out.println("Finished " + description + " companies:" + futures.size());
         } catch (Throwable t) {
             logger.warn("Failed to compact " + description, t);
         }

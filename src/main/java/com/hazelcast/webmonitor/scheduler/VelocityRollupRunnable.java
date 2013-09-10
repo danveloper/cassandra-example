@@ -6,7 +6,7 @@ import org.apache.log4j.Logger;
 
 import java.util.Iterator;
 
-public class AvgRollupRunnable extends AbstractRollupRunnable {
+public class VelocityRollupRunnable extends AbstractRollupRunnable {
 
     private final static Logger logger = Logger.getLogger(AvgRollupRunnable.class);
 
@@ -22,18 +22,23 @@ public class AvgRollupRunnable extends AbstractRollupRunnable {
     }
 
     private void processSensor(String sensor) {
+        Long first = null;
+        long last = 0;
         int count = 0;
-        int sum = 0;
         for ( Iterator<HCounterColumn<UUID>> datapointIt = source.dataPointIterator(company, sensor, startMs, endMs); datapointIt.hasNext(); ) {
             HCounterColumn<UUID> columns = datapointIt.next();
             long value = columns.getValue();
-            sum += value;
+            if(first ==null){
+                first = value;
+            }
+            last = value;
+
             count++;
         }
 
         if (count > 0) {
-            long avg = sum / count;
-            target.insert(company, sensor, startMs, avg);
+            long velocity = (1000*(last-first))/(endMs-startMs);
+            target.insert(company, sensor, startMs, velocity);
         }
     }
 }

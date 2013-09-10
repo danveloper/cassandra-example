@@ -12,11 +12,11 @@ public class GenerateMeasurementsThread extends Thread {
     private final String[] maps = new String[]{"map1"};
     private final long[] readCounters = new long[maps.length];
     private final long[] writeCounters = new long[maps.length];
-    private final BlockingQueue<Measurement> measurementQueue;
+    private final BlockingQueue<Measurements> measurementQueue;
     private final static Random random = new Random();
     private final String customer;
 
-    public GenerateMeasurementsThread(BlockingQueue<Measurement> measurementQueue, String customer) {
+    public GenerateMeasurementsThread(BlockingQueue<Measurements> measurementQueue, String customer) {
         this.measurementQueue = measurementQueue;
         this.customer = customer;
     }
@@ -30,19 +30,19 @@ public class GenerateMeasurementsThread extends Thread {
             } catch (InterruptedException e) {
             }
 
-            Measurement measurement = createMeasurement();
+            Measurements measurement = createMeasurement();
             measurementQueue.add(measurement);
         }
     }
 
-    public Measurement createMeasurement() {
-        Measurement measurement = new Measurement();
+    public Measurements createMeasurement() {
+        Measurements measurement = new Measurements();
         measurement.customer = customer;
         int clusterIndex = random.nextInt(clusters.length);
         measurement.environment = clusters[clusterIndex];
         String[] machinesForEnvironment = machines[clusterIndex];
         measurement.machine = machinesForEnvironment[random.nextInt(machinesForEnvironment.length)];
-        measurement.timeMs = System.currentTimeMillis();
+        measurement.timestampMs = System.currentTimeMillis();
         int mapIndex = random.nextInt(maps.length);
         measurement.subject = maps[mapIndex];
 

@@ -1,123 +1,29 @@
 TODO:
 
-- use company/project as unique
+- when a timeseries is aggregated, there is only information available about the time period and not about the previous
+period. This is problematic if there are only 1 datapoint. It also is problematic for the first datapoint.
 
-- maybe the whole sensorrolluprunnable should be the variable part for calulcation.
-  so by creating different implementations of this class instead of through aggregatefunctions.
-  and even this class is very limited since it will expect only data from a single sensor feed
-  and is not able to combine from different sensor feeds.
+- need a list of active clusters
 
-- aggregate on members of the cluster
-    - you want to have a total of machine operations within a cluster.
-    input:
-        key:{cluster,machine,topic}
-        column:time
-        value:count
-    output:
-        key:{cluster,machine}
-        column:time
-        value:count
-- aggregate on datastructures
-    - you want to have a total of map operations within a cluster.
-      input:
-            key:{cluster,machine,topic}
-            column:time
-            value:count
-        output:
-            key:{cluster,topic}
-            column:time
-            value:count
+QUESTIONS:
 
-- with the aggregation you ask for all keys within a time period for a given environment.
-    - this will contains different
+- can a value store a composite instead of a primitive.
 
-- the sensor name should be a composed key so that the original information is not lost.
+- use the data point technique with tags.
 
-- improved scheduling of rollers
-    - a roller for minutes, is now allowed to overtake the roller of seconds.
-    - the scheduling mechanism is not distributed
-    - the scheduling mechanism is not able to deal with a restart
+- do you want to have a chain of column families for every 'function' e.g.
+    avg-1-second, avg-5-second,avg-30-second
+  of do you want a:
+    1-second, 5-second, 30-second
 
-- aggregate function velocity
+- how to figure out which metrics are available
+    - in total
+    - for a machine
+  or should the metrics be static? So apply a filter on the incoming metrics.
 
-- failover; when a machine fails a different machines should take over the rollup.
-
-- the column-key of a rollup data should be an exact second, minute hour etc. Not the the moment the rollup was done.
-
-- a keyspace per customer?
-
-- merging different maps
-  - the problem is that it isn't clear if there are 2 measuring points of the same machine (since there is no ip)
-  or if there are 2 measuring point of 2 machines. If the machine name could be added as meta data to the column,
-  then this distinction could be made.
-
-- atomic way to create a user with a given loginname
-
-- control number of machine to be monitored for free users.
+- how to figure out which distributed data-structures are available
+   this could be calculated based on the raw data.
 
 DONE
 
-- normal user database
-
-- embedded cassandra
-http://wiki.apache.org/cassandra/Embedding
-
-- aggregate from multiple machines, same cluster, for the same 'distributed object'.
-
-- type of the value column for the measurement is changed to long; needed for counter
-
-- the scheduling mechanism currently only deals with a single customer
-
-- pass the customer family to the repository functions
-
-- add function where the column families for a customer are made
-
-- customer isolation.
-
-- find the sensors for a given customer within a give time period.
-
-- get rid of the datapointTemplate
-
-- expiring old data:
-  http://www.datastax.com/dev/blog/whats-new-cassandra-07-expiring-columns
-
-- correctly implement the names
-
-- when there are many sensors within a slice, currently it is all done on a single thread.
-    - a task per rowid could solve the problem. The question is how to figure out which rowids are there.
-
-- the rollup thread always compact for a specific rowid; but it should compact for all rowids
-
-- aggregate function
-    - average
-    - maximum
-    - minimum
-
-- currently all entries for slice a pulled and memory and then they are processed, this could lead to a OOME problem. There is real need for it since one
-can iterate over it.
-
-- compacting; currently the measurements are in miliseconds.
-    - compact to seconds
-    - compact to minutes
-    - compact to hours
-    - compact to days
-    - compact to weeks
-    - compact to months
-http://www.datastax.com/dev/blog/metric-collection-and-storage-with-cassandra
-https://github.com/bshanks/cassandra-timeseries-py
-
-- pulled creation of keyspace out of the repository; multiple repositories can now share the same keyspace.
-
-- new columnfamilies are now added on the fly.
-
-- the search results are not returned sorted.
-
-- there is a problem with the initial timestamp
-
-- multi user
-
-- the source of the measurement needs to be added
-
-- currently all measurements are in a single keyspace; should there be a keyspace per user for isolation?
-http://hector-client.github.io/hector/build/html/content/virtual_keyspaces.html
-Under water it adds a prefix transparently; so the same solution I'm using.
+- need a list of active members within a cluster (this could be done on the raw metrics)

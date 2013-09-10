@@ -1,5 +1,7 @@
 package com.hazelcast.webmonitor.repositories;
 
+import com.eaio.uuid.UUID;
+import me.prettyprint.cassandra.utils.TimeUUIDUtils;
 import me.prettyprint.hector.api.Cluster;
 import me.prettyprint.hector.api.Keyspace;
 import me.prettyprint.hector.api.ddl.ColumnFamilyDefinition;
@@ -15,6 +17,10 @@ public class AbstractRepository {
     public AbstractRepository(Cluster cluster,Keyspace keyspace) {
         this.keyspace = keyspace;
         this.cluster = cluster;
+    }
+
+    public static UUID toTimeUUID(long time) {
+        return new UUID(TimeUUIDUtils.getTimeUUID(time).toString());
     }
 
     public void add(ColumnFamilyDefinition columnFamilyDefinition){

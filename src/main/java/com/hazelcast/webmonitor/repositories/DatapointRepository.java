@@ -47,10 +47,6 @@ public class DatapointRepository extends AbstractRepository {
         return name + "_" + company + "_names";
     }
 
-    public static UUID toTimeUUID(long time) {
-        return new UUID(TimeUUIDUtils.getTimeUUID(time).toString());
-    }
-
     public void createColumnFamilies(String company) {
         ColumnFamilyDefinition datapointColumnFamily = HFactory.createColumnFamilyDefinition(
                 keyspace.getKeyspaceName(), toDatapointCfName(company));

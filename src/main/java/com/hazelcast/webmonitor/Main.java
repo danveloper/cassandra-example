@@ -1,13 +1,11 @@
 package com.hazelcast.webmonitor;
 
 import com.eaio.uuid.UUID;
+import com.hazelcast.webmonitor.repositories.ActiveMembersRepository;
 import com.hazelcast.webmonitor.repositories.CompanyRepository;
 import com.hazelcast.webmonitor.repositories.DatapointRepository;
 import com.hazelcast.webmonitor.repositories.RollupSchedulerRepository;
-import com.hazelcast.webmonitor.scheduler.AvgRollupRunnable;
-import com.hazelcast.webmonitor.scheduler.CompactRollupRunnable;
-import com.hazelcast.webmonitor.scheduler.RollupRunnable;
-import com.hazelcast.webmonitor.scheduler.RollupScheduler;
+import com.hazelcast.webmonitor.scheduler.*;
 import me.prettyprint.cassandra.service.ThriftKsDef;
 import me.prettyprint.hector.api.Cluster;
 import me.prettyprint.hector.api.Keyspace;
@@ -20,6 +18,7 @@ import org.apache.log4j.Logger;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -36,8 +35,11 @@ public class Main {
     private final DatapointRepository avg30SecondRepo;
     private final RollupScheduler scheduler;
     private final RollupSchedulerRepository schedulerRepository;
-    private final BlockingQueue<Measurement> measurementQueue = new LinkedBlockingQueue<Measurement>();
+    private final BlockingQueue<Measurements> measurementQueue = new LinkedBlockingQueue<Measurements>();
     private final DatapointRepository compactedSecondRepo;
+    private final DatapointRepository velocity1SecondRepo;
+    private final DatapointRepository velocity5SecondRepo;
+    private final ActiveMembersRepository activeMembersRepository;
 
     public Main() {
         //startCassandra();
@@ -47,6 +49,7 @@ public class Main {
 
         companyRepository = new CompanyRepository(cluster, keyspace);
         schedulerRepository = new RollupSchedulerRepository(cluster, keyspace);
+        activeMembersRepository = new ActiveMembersRepository(cluster,keyspace);
 
         rawRepo = new DatapointRepository(cluster, keyspace, "Measurements", (int) TimeUnit.HOURS.toMillis(1));
 
@@ -57,12 +60,19 @@ public class Main {
         avg30SecondRepo = new DatapointRepository(cluster, keyspace, "Average30Seconds", (int) TimeUnit.HOURS.toMillis(1));
 
         scheduler = new RollupScheduler(schedulerRepository, companyRepository);
+
+        velocity1SecondRepo = new DatapointRepository(cluster, keyspace, "Velocity1Second", (int) TimeUnit.HOURS.toMillis(1));
+        velocity5SecondRepo = new DatapointRepository(cluster, keyspace, "Velocity5Second", (int) TimeUnit.HOURS.toMillis(1));
+
         //  scheduler.schedule(rawRepo, avgSecondRepo, AvgRollupRunnable.class, 1000);
-        scheduler.schedule(rawRepo, avgSecondRepo, AvgRollupRunnable.class, 1000);
-        scheduler.schedule(rawRepo, avgSecondRepo, CompactRollupRunnable.class, 1000);
+        scheduler.schedule("avg 1 second",rawRepo, avgSecondRepo, AvgRollupRunnable.class, 1000);
+        scheduler.schedule("compact 1 second",rawRepo, avgSecondRepo, CompactRollupRunnable.class, 1000);
       //  scheduler.schedule(rawRepo2, avgSecondRepo, AvgRollupRunnable.class, 1000);
-         scheduler.schedule(avgSecondRepo, avgFiveSecondRepo, AvgRollupRunnable.class, 5000);
-          scheduler.schedule(avgFiveSecondRepo, avg30SecondRepo, AvgRollupRunnable.class, 30000);
+         scheduler.schedule("avg 5 second",avgSecondRepo, avgFiveSecondRepo, AvgRollupRunnable.class, 5000);
+         scheduler.schedule("avg 30 second",avgFiveSecondRepo, avg30SecondRepo, AvgRollupRunnable.class, 30000);
+
+        scheduler.schedule("velocity 1 second",rawRepo, velocity1SecondRepo, VelocityRollupRunnable.class, 1000);
+        scheduler.schedule("velocity 5 second",velocity1SecondRepo, velocity5SecondRepo, AvgRollupRunnable.class, 5000);
     }
 
     public static void startCassandra() {
@@ -79,9 +89,11 @@ public class Main {
         avgFiveSecondRepo.createColumnFamilies(company);
         avg30SecondRepo.createColumnFamilies(company);
         compactedSecondRepo.createColumnFamilies(company);
-        System.out.println("Companies before insert: "+companyRepository.getCompanyNames());
+
+        velocity1SecondRepo.createColumnFamilies(company);
+        velocity5SecondRepo.createColumnFamilies(company);
+
         companyRepository.save(company);
-        System.out.println("Companies after insert: "+companyRepository.getCompanyNames());
     }
 
     public void start() throws InterruptedException {
@@ -96,11 +108,13 @@ public class Main {
             public void run() {
                 try {
                     for (; ; ) {
-                        Measurement measurement = measurementQueue.take();
+                        Measurements measurement = measurementQueue.take();
                         for (Map.Entry<String, Long> entry : measurement.map.entrySet()) {
 
-                            String sensorPerMachine = measurement.environment + "!" + measurement.machine + "!" + measurement.subject + "!" + entry.getKey();
-                            rawRepo.insert(measurement.customer, sensorPerMachine, measurement.timeMs, entry.getValue());
+                            String sensor = measurement.environment + "!" + measurement.machine + "!" + measurement.subject + "!" + entry.getKey();
+                            rawRepo.insert(measurement.customer, sensor, measurement.timestampMs, entry.getValue());
+
+                            activeMembersRepository.insert(measurement.customer,measurement.environment, measurement.machine,measurement.timestampMs);
                         }
                     }
                 } catch (Throwable t) {
@@ -109,11 +123,19 @@ public class Main {
             }
         }.start();
 
-        Thread.sleep(20000);
+       for(int k=0;k<20;k++){
+           long time = System.currentTimeMillis();
+           Set<String> members = activeMembersRepository.getActiveMembers(company,"dev",time-1000,time+1000);
+           System.out.println(members);
+           Thread.sleep(1000);
+       }
+
+        //Thread.sleep(20000);
 
         long endTime = System.currentTimeMillis();
 
-        print("avg 5 seconds",avgFiveSecondRepo, company, startTime, endTime);
+        print("velocity 1 seconds",velocity1SecondRepo, company, startTime, endTime);
+        print("velocity 5 seconds",velocity5SecondRepo, company, startTime, endTime);
 
         System.out.println("finished");
         System.exit(0);

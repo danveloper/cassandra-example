@@ -1,6 +1,5 @@
 package com.hazelcast.webmonitor.scheduler;
 
-import com.hazelcast.webmonitor.aggregatefunctions.AggregateFunctionFactory;
 import com.hazelcast.webmonitor.repositories.CompanyRepository;
 import com.hazelcast.webmonitor.repositories.DatapointRepository;
 import com.hazelcast.webmonitor.repositories.RollupSchedulerRepository;
@@ -19,11 +18,11 @@ public class RollupScheduler {
         this.schedulerRepository = schedulerRepository;
     }
 
-    public void schedule(DatapointRepository source, DatapointRepository target, Class<? extends AbstractRollupRunnable> clazz, int periodMs) {
+    public void schedule(String desc, DatapointRepository source, DatapointRepository target, Class<? extends AbstractRollupRunnable> clazz, int periodMs) {
         RollupRunnable rollupRunnable = new RollupRunnable(
                 source,
                 target,
-                "average 1 second",
+                desc,
                 clazz,
                 executor, companyRepository);
 
