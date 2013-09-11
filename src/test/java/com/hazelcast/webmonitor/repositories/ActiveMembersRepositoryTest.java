@@ -34,6 +34,15 @@ public class ActiveMembersRepositoryTest extends AbstractRepositoryTest {
     }
 
     @Test
+    public void getActiveClusters(){
+        activeMembersRepository.insert("hazelcast","dev","192.168.1.1:5701",100);
+
+        Set<String> members = activeMembersRepository.getActiveClusters("hazelcast",0,200);
+        assertEquals(1,members.size());
+        assertTrue(members.contains("dev"));
+    }
+
+    @Test
     public void getActiveMembers_inActiveMember(){
         activeMembersRepository.insert("hazelcast","dev","192.168.1.1:5701",100);
 

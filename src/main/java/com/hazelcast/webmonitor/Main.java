@@ -29,7 +29,7 @@ public class Main {
     private final Cluster cluster;
     private final Keyspace keyspace;
     private final CompanyRepository companyRepository;
-    private final DatapointRepository rawRepo;
+    private final DatapointRepository rawDatapointRepo;
     private final DatapointRepository avgSecondRepo;
     private final DatapointRepository avgFiveSecondRepo;
     private final DatapointRepository avg30SecondRepo;
@@ -39,7 +39,7 @@ public class Main {
     private final DatapointRepository compactedSecondRepo;
     private final DatapointRepository velocity1SecondRepo;
     private final DatapointRepository velocity5SecondRepo;
-    private final ActiveMembersRepository activeMembersRepository;
+    private final ActiveMembersRepository rawActiveMembersRepository;
 
     public Main() {
         //startCassandra();
@@ -49,9 +49,8 @@ public class Main {
 
         companyRepository = new CompanyRepository(cluster, keyspace);
         schedulerRepository = new RollupSchedulerRepository(cluster, keyspace);
-        activeMembersRepository = new ActiveMembersRepository(cluster,keyspace);
-
-        rawRepo = new DatapointRepository(cluster, keyspace, "Measurements", (int) TimeUnit.HOURS.toMillis(1));
+        rawActiveMembersRepository = new ActiveMembersRepository(cluster,keyspace, "raw_");
+        rawDatapointRepo = new DatapointRepository(cluster, keyspace, "Measurements", (int) TimeUnit.HOURS.toMillis(1));
 
         avgSecondRepo = new DatapointRepository(cluster, keyspace, "AverageSecond", (int) TimeUnit.HOURS.toMillis(1));
         compactedSecondRepo = new DatapointRepository(cluster, keyspace, "Compacted", (int) TimeUnit.HOURS.toMillis(1));
@@ -64,14 +63,14 @@ public class Main {
         velocity1SecondRepo = new DatapointRepository(cluster, keyspace, "Velocity1Second", (int) TimeUnit.HOURS.toMillis(1));
         velocity5SecondRepo = new DatapointRepository(cluster, keyspace, "Velocity5Second", (int) TimeUnit.HOURS.toMillis(1));
 
-        //  scheduler.schedule(rawRepo, avgSecondRepo, AvgRollupRunnable.class, 1000);
-        scheduler.schedule("avg 1 second",rawRepo, avgSecondRepo, AvgRollupRunnable.class, 1000);
-        scheduler.schedule("compact 1 second",rawRepo, avgSecondRepo, CompactRollupRunnable.class, 1000);
+        //  scheduler.schedule(rawDatapointRepo, avgSecondRepo, AvgRollupRunnable.class, 1000);
+        scheduler.schedule("avg 1 second", rawDatapointRepo, avgSecondRepo, AvgRollupRunnable.class, 1000);
+        scheduler.schedule("compact 1 second", rawDatapointRepo, avgSecondRepo, CompactRollupRunnable.class, 1000);
       //  scheduler.schedule(rawRepo2, avgSecondRepo, AvgRollupRunnable.class, 1000);
          scheduler.schedule("avg 5 second",avgSecondRepo, avgFiveSecondRepo, AvgRollupRunnable.class, 5000);
          scheduler.schedule("avg 30 second",avgFiveSecondRepo, avg30SecondRepo, AvgRollupRunnable.class, 30000);
 
-        scheduler.schedule("velocity 1 second",rawRepo, velocity1SecondRepo, VelocityRollupRunnable.class, 1000);
+        scheduler.schedule("velocity 1 second", rawDatapointRepo, velocity1SecondRepo, VelocityRollupRunnable.class, 1000);
         scheduler.schedule("velocity 5 second",velocity1SecondRepo, velocity5SecondRepo, AvgRollupRunnable.class, 5000);
     }
 
@@ -84,7 +83,7 @@ public class Main {
     }
 
     public void registerCustomer(String company) {
-        rawRepo.createColumnFamilies(company);
+        rawDatapointRepo.createColumnFamilies(company);
         avgSecondRepo.createColumnFamilies(company);
         avgFiveSecondRepo.createColumnFamilies(company);
         avg30SecondRepo.createColumnFamilies(company);
@@ -112,10 +111,18 @@ public class Main {
                         for (Map.Entry<String, Long> entry : measurement.map.entrySet()) {
 
                             String sensor = measurement.environment + "!" + measurement.machine + "!" + measurement.subject + "!" + entry.getKey();
-                            rawRepo.insert(measurement.customer, sensor, measurement.timestampMs, entry.getValue());
-
-                            activeMembersRepository.insert(measurement.customer,measurement.environment, measurement.machine,measurement.timestampMs);
+                            rawDatapointRepo.insert(
+                                    measurement.customer,
+                                    sensor,
+                                    measurement.timestampMs,
+                                    entry.getValue());
                         }
+
+                        rawActiveMembersRepository.insert(
+                                measurement.customer,
+                                measurement.environment,
+                                measurement.machine,
+                                measurement.timestampMs);
                     }
                 } catch (Throwable t) {
                     logger.error(t);
@@ -125,7 +132,7 @@ public class Main {
 
        for(int k=0;k<20;k++){
            long time = System.currentTimeMillis();
-           Set<String> members = activeMembersRepository.getActiveMembers(company,"dev",time-1000,time+1000);
+           Set<String> members = rawActiveMembersRepository.getActiveMembers(company,"dev",time-1000,time+1000);
            System.out.println(members);
            Thread.sleep(1000);
        }

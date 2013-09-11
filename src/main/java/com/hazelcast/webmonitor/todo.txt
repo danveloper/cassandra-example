@@ -3,11 +3,11 @@ TODO:
 - when a timeseries is aggregated, there is only information available about the time period and not about the previous
 period. This is problematic if there are only 1 datapoint. It also is problematic for the first datapoint.
 
-- need a list of active clusters
+- compression of active members, servers
 
 QUESTIONS:
 
-- can a value store a composite instead of a primitive.
+- can a value store a composite instead of a primitive: also a composite could be stored as value
 
 - use the data point technique with tags.
 
@@ -25,5 +25,7 @@ QUESTIONS:
    this could be calculated based on the raw data.
 
 DONE
+
+- need a list of active clusters
 
 - need a list of active members within a cluster (this could be done on the raw metrics)

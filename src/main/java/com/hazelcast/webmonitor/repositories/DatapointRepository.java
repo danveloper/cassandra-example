@@ -4,7 +4,6 @@ import com.eaio.uuid.UUID;
 import me.prettyprint.cassandra.serializers.CompositeSerializer;
 import me.prettyprint.cassandra.serializers.StringSerializer;
 import me.prettyprint.cassandra.serializers.TimeUUIDSerializer;
-import me.prettyprint.cassandra.utils.TimeUUIDUtils;
 import me.prettyprint.hector.api.Cluster;
 import me.prettyprint.hector.api.Keyspace;
 import me.prettyprint.hector.api.beans.Composite;
@@ -43,24 +42,24 @@ public class DatapointRepository extends AbstractRepository {
         return name + "_" + company;
     }
 
-    private String toSensornamesCfName(String company) {
+    private String toSensornameCfName(String company) {
         return name + "_" + company + "_names";
     }
 
     public void createColumnFamilies(String company) {
         ColumnFamilyDefinition datapointColumnFamily = HFactory.createColumnFamilyDefinition(
                 keyspace.getKeyspaceName(), toDatapointCfName(company));
-        //Defines how to store, compare and validate the column names
-        datapointColumnFamily.setComparatorType(ComparatorType.TIMEUUIDTYPE);
         //Validator to use for keys
         datapointColumnFamily.setKeyValidationClass(ComparatorType.UTF8TYPE.getClassName());
+        //Defines how to store, compare and validate the column names
+        datapointColumnFamily.setComparatorType(ComparatorType.TIMEUUIDTYPE);
         //Validator to use for values in columns
         datapointColumnFamily.setDefaultValidationClass(ComparatorType.COUNTERTYPE.getClassName());
 
         ColumnFamilyDefinition sensornameColumnFamily = HFactory.createColumnFamilyDefinition(
-                keyspace.getKeyspaceName(), toSensornamesCfName(company), ComparatorType.COMPOSITETYPE);
-        sensornameColumnFamily.setComparatorTypeAlias("(TimeUUIDType, UTF8Type)");
+                keyspace.getKeyspaceName(), toSensornameCfName(company));
         sensornameColumnFamily.setKeyValidationClass("UTF8Type");
+        sensornameColumnFamily.setComparatorTypeAlias("(TimeUUIDType, UTF8Type, UTF8Type)");
         sensornameColumnFamily.setDefaultValidationClass("UTF8Type");
 
         add(datapointColumnFamily);
@@ -82,6 +81,7 @@ public class DatapointRepository extends AbstractRepository {
         Composite timenameColumnKey = new Composite();
         timenameColumnKey.addComponent(timeUUID, TimeUUIDSerializer.get());
         timenameColumnKey.addComponent(sensor, StringSerializer.get());
+        timenameColumnKey.addComponent(sensor, StringSerializer.get());
 
         Mutator<String> sensornameMutator = createMutator(keyspace, StringSerializer.get());
         HColumn<Composite, String> sensornameColumn = HFactory.createColumn(
@@ -90,7 +90,7 @@ public class DatapointRepository extends AbstractRepository {
                 new CompositeSerializer(),
                 StringSerializer.get());
         sensornameColumn.setTtl(ttlMs);
-        sensornameMutator.addInsertion("name", toSensornamesCfName(company), sensornameColumn);
+        sensornameMutator.addInsertion("name", toSensornameCfName(company), sensornameColumn);
         sensornameMutator.execute();
     }
 
@@ -151,7 +151,7 @@ public class DatapointRepository extends AbstractRepository {
         SliceQuery<String, Composite, String> query = createSliceQuery(keyspace, StringSerializer.get(),
                 CompositeSerializer.get(),
                 StringSerializer.get());
-        query.setColumnFamily(toSensornamesCfName(company));
+        query.setColumnFamily(toSensornameCfName(company));
         query.setKey("name");
         query.setRange(begin, end, false, Integer.MAX_VALUE);
 

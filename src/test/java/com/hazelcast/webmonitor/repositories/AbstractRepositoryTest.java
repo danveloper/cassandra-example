@@ -15,7 +15,7 @@ public class AbstractRepositoryTest {
     public final String KEYSPACE = generateKeySpaceName();
 
     private String generateKeySpaceName() {
-        return "Test_" + UUID.randomUUID().toString().replace("-", "");
+        return "RepositoryTest";
     }
 
     public Cluster cluster;
@@ -23,15 +23,22 @@ public class AbstractRepositoryTest {
 
      public void setUp() {
         cluster = HFactory.getOrCreateCluster("test-cluster", "localhost:9160");
-        keyspace = createKeyspace(cluster, KEYSPACE);
+
+         KeyspaceDefinition keyspaceDef = cluster.describeKeyspace(KEYSPACE);
+         if (keyspaceDef != null) {
+             cluster.dropKeyspace(KEYSPACE);
+         }
+
+         keyspace = createKeyspace(cluster, KEYSPACE);
     }
 
     @After
     public void tearDown() {
         if (cluster != null) {
+
             KeyspaceDefinition keyspaceDef = cluster.describeKeyspace(KEYSPACE);
             if (keyspaceDef != null) {
-                cluster.dropKeyspace(KEYSPACE);
+            //    cluster.dropKeyspace(KEYSPACE);
             }
         }
     }
