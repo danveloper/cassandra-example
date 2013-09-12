@@ -1,5 +1,6 @@
 package com.hazelcast.webmonitor.newdatapoint;
 
+import com.hazelcast.webmonitor.repositories.DatapointRepository;
 import me.prettyprint.hector.api.Cluster;
 import me.prettyprint.hector.api.Keyspace;
 
@@ -21,7 +22,7 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 public class DatapointCollector {
 
-    private final NewDatapointRepository[] repositories;
+    private final DatapointRepository[] repositories;
 
     private final AtomicReference<List<Datapoint>> dataPointsRef = new AtomicReference<List<Datapoint>>(new Vector<Datapoint>());
 
@@ -32,7 +33,7 @@ public class DatapointCollector {
             throw new IllegalArgumentException();
         }
 
-        repositories = new NewDatapointRepository[rollupPeriods.length];
+        repositories = new DatapointRepository[rollupPeriods.length];
         long maximumRollupMs = Long.MIN_VALUE;
 
         for (int k = 0; k < repositories.length; k++) {
@@ -45,13 +46,13 @@ public class DatapointCollector {
             if (rollupPeriodMs > maximumRollupMs) {
                 maximumRollupMs = rollupPeriodMs;
             }
-            repositories[k] = new NewDatapointRepository(cluster, keyspace, "by_" + rollupPeriodSeconds + "_seconds", rollupPeriodMs);
+            repositories[k] = new DatapointRepository(cluster, keyspace, "by_" + rollupPeriodSeconds + "_seconds", rollupPeriodMs);
         }
         this.maximumRollupMs = maximumRollupMs;
     }
 
-    public NewDatapointRepository getRepository(int rollupPeriod) {
-        for (NewDatapointRepository repo : repositories) {
+    public DatapointRepository getRepository(int rollupPeriod) {
+        for (DatapointRepository repo : repositories) {
             if (repo.getRollupPeriodMs() == rollupPeriod * 1000) {
                 return repo;
             }
@@ -137,7 +138,7 @@ public class DatapointCollector {
             head.count++;
         }
 
-        void aggregate(NewDatapointRepository repository, long timeMs) {
+        void aggregate(DatapointRepository repository, long timeMs) {
             long rollupPeriodMs = repository.getRollupPeriodMs();
             long maxTime = System.currentTimeMillis() - rollupPeriodMs;
 
@@ -213,7 +214,7 @@ public class DatapointCollector {
         }
 
         for (Aggregator aggregator : aggregators.values()) {
-            for (NewDatapointRepository repository : repositories) {
+            for (DatapointRepository repository : repositories) {
                 aggregator.aggregate(repository, timeMs);
             }
         }

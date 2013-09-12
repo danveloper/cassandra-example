@@ -64,7 +64,7 @@ public class ActiveMembersRepository extends AbstractRepository {
 
     public void insert(String company, String cluster, String member, long timeMs) {
         //timeMs = (timeMs / 1000)*timeMs;
-        UUID timeUUID = toTimeUUID(timeMs);
+        UUID timeUUID = CassandraUtils.toTimeUUID(timeMs);
 
         insertMember(company, cluster, member, timeUUID);
         insertCluster(company, cluster, timeUUID);
@@ -108,11 +108,11 @@ public class ActiveMembersRepository extends AbstractRepository {
         String endString = Character.toString(Character.MAX_VALUE);
 
         Composite begin = new Composite();
-        begin.addComponent(toTimeUUID(startMs), TimeUUIDSerializer.get());
+        begin.addComponent(CassandraUtils.toTimeUUID(startMs), TimeUUIDSerializer.get());
         begin.addComponent(beginString, StringSerializer.get());
 
         Composite end = new Composite();
-        end.addComponent(toTimeUUID(endMs), TimeUUIDSerializer.get());
+        end.addComponent(CassandraUtils.toTimeUUID(endMs), TimeUUIDSerializer.get());
         end.addComponent(endString, StringSerializer.get());
 
         SliceQuery<String, Composite, String> query = createSliceQuery(keyspace, StringSerializer.get(),
@@ -139,7 +139,7 @@ public class ActiveMembersRepository extends AbstractRepository {
                 StringSerializer.get());
         query.setColumnFamily(activeClusterColDef.getName());
         query.setKey(rowKey);
-        query.setRange(toTimeUUID(startMs), toTimeUUID(endMs), false, Integer.MAX_VALUE);
+        query.setRange(CassandraUtils.toTimeUUID(startMs), CassandraUtils.toTimeUUID(endMs), false, Integer.MAX_VALUE);
 
         Iterator<HColumn<UUID, String>> iterator = query.execute().get().getColumns().iterator();
         Set<String> result = new HashSet<String>();

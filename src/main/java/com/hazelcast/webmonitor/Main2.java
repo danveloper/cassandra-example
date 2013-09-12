@@ -17,13 +17,13 @@ public class Main2 {
     public static void main(String[] args) throws Exception {
         Cluster cluster = HFactory.getOrCreateCluster("test-cluster", "localhost:9160");
         Keyspace keyspace = createKeyspace(cluster, "Measurements");
-        DatapointCollector collector = new DatapointCollector(cluster, keyspace, new int[]{1,5,10});
+        DatapointCollector collector = new DatapointCollector(cluster, keyspace, new int[]{1,5,10,30});
         collector.start();
 
         String metricName = "IMap.readCount";
 
         long startTimeMs = System.currentTimeMillis();
-        for (int k = 0; k < 300; k++) {
+        for (int k = 0; k < 3000; k++) {
             Thread.sleep(100);
 
             Datapoint datapoint = new Datapoint();
@@ -58,7 +58,7 @@ public class Main2 {
         //print(collector.getRepository(10).slice("min(IMap.readCount)", startTimeMs, endTimeMs));
 
         System.out.println("avg Per 10 seconds");
-        print(collector.getRepository(10).slice("avg(IMap.readCount)", startTimeMs, endTimeMs));
+        print(collector.getRepository(30).slice("avg(IMap.readCount)", startTimeMs, endTimeMs));
 
         //System.out.println("max Per 30 seconds");
         //print(collector.getRepository(30).slice("max(IMap.readCount)", startTimeMs, endTimeMs));

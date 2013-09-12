@@ -1,105 +1,70 @@
 package com.hazelcast.webmonitor.repositories;
 
-import me.prettyprint.hector.api.Cluster;
-import me.prettyprint.hector.api.Keyspace;
-import me.prettyprint.hector.api.ddl.KeyspaceDefinition;
-import me.prettyprint.hector.api.factory.HFactory;
-import org.junit.After;
+import com.hazelcast.webmonitor.newdatapoint.Datapoint;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.util.*;
-import java.util.concurrent.TimeUnit;
+import java.util.List;
 
-import static me.prettyprint.hector.api.factory.HFactory.createKeyspaceDefinition;
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
-public class DatapointRepositoryTest {
+public class DatapointRepositoryTest extends AbstractRepositoryTest {
 
-    public  final String KEYSPACE = generateKeySpaceName();
-    String customer = "hazelcast";
-
-    private String generateKeySpaceName() {
-        return "Test_"+ UUID.randomUUID().toString().replace("-","");
-    }
-
-    private Cluster cluster;
-    private DatapointRepository repository;
+    private DatapointRepository datapointRepository;
 
     @Before
     public void setUp() {
-        cluster = HFactory.getOrCreateCluster("test-cluster", "localhost:9160");
-        Keyspace keyspace = createKeyspace(cluster, KEYSPACE);
-        repository = new DatapointRepository(cluster, keyspace, "peter",(int) TimeUnit.HOURS.toMillis(1));
-        repository.createColumnFamilies(customer);
-    }
-
-    @After
-    public void tearDown(){
-       if(cluster!=null){
-           KeyspaceDefinition keyspaceDef = cluster.describeKeyspace(KEYSPACE);
-           if (keyspaceDef != null) {
-               cluster.dropKeyspace(KEYSPACE);
-           }
-       }
-    }
-
-    private static Keyspace createKeyspace(Cluster cluster, String keyspaceName) {
-        KeyspaceDefinition keyspaceDef = createKeyspaceDefinition(keyspaceName);
-        cluster.addKeyspace(keyspaceDef, true);
-        return HFactory.createKeyspace(keyspaceDef.getName(), cluster);
+        super.setUp();
+        datapointRepository = new DatapointRepository(cluster, keyspace,"datapoints",1);
     }
 
     @Test
-    public void increment() {
-        long time = System.currentTimeMillis();
-        repository.insert(customer, "foo", time, 1);
-        repository.insert(customer, "foo", time, 2);
-        Long result = repository.read(customer,"foo", time);
-        assertEquals(new Long(3), result);
-    }
+    public void slice() throws InterruptedException {
+        Datapoint datapoint = createDatapoint();
+        datapointRepository.insert(datapoint);
 
+        System.out.println(datapoint);
 
-    @Test
-    public void readExisting() {
-        long time = System.currentTimeMillis();
-        repository.insert(customer, "foo", time, 1);
-        Long result = repository.read(customer,"foo", time);
-        assertEquals(new Long(1), result);
+        List<Datapoint> result = datapointRepository.slice(datapoint.metricName, datapoint.timestampMs - 1, datapoint.timestampMs + 1);
+
+        assertEquals(1, result.size());
+        assertTrue(result.contains(datapoint));
     }
 
     @Test
-    public void readNonExisting() {
-        long time = System.currentTimeMillis();
-        Long result = repository.read(customer,"foo", time);
-        assertNull(result);
+    public void sliceWithMember() {
+        Datapoint datapoint1 = createDatapoint();
+        Datapoint datapoint2 = new Datapoint(datapoint1);
+        datapoint2.member="192.168.1.2";
+        Datapoint datapoint3 = new Datapoint(datapoint1);
+        datapoint3.member="192.168.1.3";
+
+        datapointRepository.insert(datapoint1);
+        datapointRepository.insert(datapoint1);
+        datapointRepository.insert(datapoint1);
+
+        List<Datapoint> result = datapointRepository.sliceForMember(datapoint1.metricName, datapoint1.member, datapoint1.timestampMs - 1, datapoint1.timestampMs + 1);
+
+        assertEquals(1, result.size());
+        assertTrue(result.contains(datapoint1));
     }
 
-    @Test
-    public void sensorNameIterator_noNames() {
-        long time = System.currentTimeMillis();
-        Iterator it = repository.sensorNameIterator(customer,time, time);
-        assertFalse(it.hasNext());
-    }
-
-    @Test
-    public void sensorNameIterator_multipleNames() {
-        long time = System.currentTimeMillis();
-        repository.insert(customer, "foo", time, 1);
-        repository.insert(customer, "bar", time, 1);
-
-        Set <String> names = toSet(repository.sensorNameIterator(customer,time, time));
-        assertEquals(2, names.size());
-        assertTrue(names.contains("foo"));
-        assertTrue(names.contains("bar"));
-    }
-
-    public Set<String> toSet(Iterator<String> it) {
-        HashSet<String> result = new HashSet<String>();
-        for (; it.hasNext(); ) {
-            result.add(it.next());
+    public void print(List<Datapoint> datapoints){
+        for(Datapoint datapoint: datapoints){
+            System.out.println(datapoint);
         }
+    }
 
-        return result;
+    public Datapoint createDatapoint() {
+        Datapoint datapoint = new Datapoint();
+        datapoint.metricName = "IMap.readCount";
+        datapoint.value = 500;
+        datapoint.timestampMs = System.currentTimeMillis();
+        datapoint.cluster = "dev";
+        datapoint.member = "192.168.1.1";
+        datapoint.id = "map1";
+        datapoint.company = "hazelcast";
+        return datapoint;
     }
 }

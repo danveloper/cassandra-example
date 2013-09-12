@@ -1,6 +1,8 @@
 package com.hazelcast.webmonitor.repositories;
 
+import com.eaio.uuid.UUID;
 import me.prettyprint.cassandra.serializers.StringSerializer;
+import me.prettyprint.cassandra.utils.TimeUUIDUtils;
 import org.apache.cassandra.thrift.ColumnDef;
 import org.apache.cassandra.thrift.IndexType;
 
@@ -26,4 +28,7 @@ public class CassandraUtils {
     private CassandraUtils() {
     }
 
+    public static UUID toTimeUUID(long time) {
+        return new UUID(TimeUUIDUtils.getTimeUUID(time).toString());
+    }
 }
