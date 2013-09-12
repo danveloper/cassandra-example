@@ -181,7 +181,7 @@ public class DatapointCollector {
             result.metricName = template.metricName;
             result.maximum = maxvalue;
             result.minimum = minvalue;
-            result.avg = items == 0 ? 0 : sum / items;
+            result.average = items == 0 ? 0 : sum / items;
             repository.insert(result);
         }
     }

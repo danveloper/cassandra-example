@@ -1,7 +1,5 @@
 package com.hazelcast.webmonitor.datapoints;
 
-import com.hazelcast.webmonitor.datapoints.DatapointRepository;
-import com.hazelcast.webmonitor.datapoints.Datapoint;
 import com.hazelcast.webmonitor.repositories.AbstractRepositoryTest;
 import org.junit.Before;
 import org.junit.Test;
@@ -68,7 +66,7 @@ public class DatapointRepositoryTest extends AbstractRepositoryTest {
         datapoint.metricName = "IMap.readCount";
         datapoint.maximum = 500;
         datapoint.minimum = 200;
-        datapoint.avg = 10;
+        datapoint.average = 10;
         datapoint.timestampMs = System.currentTimeMillis();
         datapoint.cluster = "dev";
         datapoint.member = "192.168.1.1";

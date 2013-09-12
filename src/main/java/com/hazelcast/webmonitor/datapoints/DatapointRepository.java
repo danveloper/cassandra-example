@@ -36,7 +36,11 @@ import static me.prettyprint.hector.api.factory.HFactory.createSliceQuery;
  * http://www.datastax.com/dev/blog/metric-collection-and-storage-with-cassandra
  */
 public class DatapointRepository extends AbstractRepository {
-    public final static int LONG_SIZE = 8;
+    private final static int LONG_SIZE = 8;
+    private final static int OFFSET_MINIMUM = 0 * LONG_SIZE;
+    private final static int OFFSET_MAXIMUM = 1 * LONG_SIZE;
+    private final static int OFFSET_AVERAGE = 2 * LONG_SIZE;
+    private final static int OFFSET_VELOCITY = 3 * LONG_SIZE;
 
     private final ColumnFamilyDefinition cf;
     private final int rollupPeriodMs;
@@ -73,10 +77,11 @@ public class DatapointRepository extends AbstractRepository {
         columnKey.addComponent(datapoint.member, StringSerializer.get());
         columnKey.addComponent(datapoint.id, StringSerializer.get());
 
-        ByteBuffer value = ByteBuffer.allocate(3 * LONG_SIZE);
-        value.putDouble(0, datapoint.maximum);
-        value.putDouble(LONG_SIZE, datapoint.minimum);
-        value.putDouble(2 * LONG_SIZE, datapoint.avg);
+        ByteBuffer value = ByteBuffer.allocate(4 * LONG_SIZE);
+        value.putDouble(OFFSET_MINIMUM, datapoint.minimum);
+        value.putDouble(OFFSET_MAXIMUM, datapoint.maximum);
+        value.putDouble(OFFSET_AVERAGE, datapoint.average);
+        value.putDouble(OFFSET_VELOCITY, datapoint.velocity);
 
         Mutator<Composite> mutator = createMutator(keyspace, CompositeSerializer.get());
         HColumn<Composite, byte[]> column = HFactory.createColumn(
@@ -164,9 +169,10 @@ public class DatapointRepository extends AbstractRepository {
 
         //retrieve state from the value
         ByteBuffer byteBuffer = ByteBuffer.wrap(hcolumn.getValue());
-        datapoint.maximum = byteBuffer.getDouble(0);
-        datapoint.minimum = byteBuffer.getDouble(LONG_SIZE);
-        datapoint.avg = byteBuffer.getDouble(2 * LONG_SIZE);
+        datapoint.maximum = byteBuffer.getDouble(OFFSET_MAXIMUM);
+        datapoint.minimum = byteBuffer.getDouble(OFFSET_MINIMUM);
+        datapoint.average = byteBuffer.getDouble(OFFSET_AVERAGE);
+        datapoint.velocity = byteBuffer.getDouble(OFFSET_VELOCITY);
 
         return datapoint;
     }

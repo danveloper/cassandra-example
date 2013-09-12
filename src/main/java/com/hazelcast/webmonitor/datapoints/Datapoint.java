@@ -11,16 +11,17 @@ public class Datapoint {
 
     public double minimum;
     public double maximum;
-    public double avg;
+    public double average;
+    public double velocity;
 
     public Datapoint() {
     }
 
-    public Datapoint(Datapoint datapoint){
-        this(datapoint.metricName,datapoint.timestampMs,datapoint.cluster,datapoint.member,datapoint.id,datapoint.company,datapoint.minimum,datapoint.maximum,datapoint.avg);
+    public Datapoint(Datapoint that){
+        this(that.metricName,that.timestampMs,that.cluster,that.member,that.id,that.company,that.minimum,that.maximum,that.average,that.velocity);
     }
 
-    public Datapoint(String metricName, long timestampMs, String cluster, String member, String id, String company, double minimum, double maximum, double avg) {
+    public Datapoint(String metricName, long timestampMs, String cluster, String member, String id, String company, double minimum, double maximum, double average,double velocity) {
         this.metricName = metricName;
         this.timestampMs = timestampMs;
         this.cluster = cluster;
@@ -29,7 +30,8 @@ public class Datapoint {
         this.company = company;
         this.minimum = minimum;
         this.maximum = maximum;
-        this.avg = avg;
+        this.average = average;
+        this.velocity = velocity;
     }
 
     @Override
@@ -43,7 +45,8 @@ public class Datapoint {
                 ", company='" + company + '\'' +
                 ", minimum=" + minimum +
                 ", maximum=" + maximum +
-                ", avg=" + avg +
+                ", average=" + average +
+                ", velocity=" + velocity +
                 '}';
     }
 
@@ -54,9 +57,10 @@ public class Datapoint {
 
         Datapoint datapoint = (Datapoint) o;
 
-        if (Double.compare(datapoint.avg, avg) != 0) return false;
+        if (Double.compare(datapoint.average, average) != 0) return false;
         if (Double.compare(datapoint.maximum, maximum) != 0) return false;
         if (Double.compare(datapoint.minimum, minimum) != 0) return false;
+        if (Double.compare(datapoint.velocity, velocity) != 0) return false;
         if (timestampMs != datapoint.timestampMs) return false;
         if (cluster != null ? !cluster.equals(datapoint.cluster) : datapoint.cluster != null) return false;
         if (company != null ? !company.equals(datapoint.company) : datapoint.company != null) return false;
@@ -77,11 +81,13 @@ public class Datapoint {
         result = 31 * result + (member != null ? member.hashCode() : 0);
         result = 31 * result + (id != null ? id.hashCode() : 0);
         result = 31 * result + (company != null ? company.hashCode() : 0);
+        temp = Double.doubleToLongBits(velocity);
+        result = 31 * result + (int) (temp ^ (temp >>> 32));
         temp = Double.doubleToLongBits(minimum);
         result = 31 * result + (int) (temp ^ (temp >>> 32));
         temp = Double.doubleToLongBits(maximum);
         result = 31 * result + (int) (temp ^ (temp >>> 32));
-        temp = Double.doubleToLongBits(avg);
+        temp = Double.doubleToLongBits(average);
         result = 31 * result + (int) (temp ^ (temp >>> 32));
         return result;
     }
