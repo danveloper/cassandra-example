@@ -98,7 +98,11 @@ public class DatapointCollector {
 
     static class Node {
         Node next;
-        Datapoint value;
+        long timestampMs;
+        long maximum = Long.MIN_VALUE;
+        long minimum = Long.MAX_VALUE;
+        long count;
+        long total;
     }
 
     class Aggregator {
@@ -106,15 +110,31 @@ public class DatapointCollector {
         private Datapoint template;
         private Node head;
 
-        void publish(Datapoint datapoint) {
+        void publish(Datapoint datapoint, long timeMs) {
             if (template == null) {
                 template = new Datapoint(datapoint);
             }
 
-            Node node = new Node();
-            node.value = datapoint;
-            node.next = head;
-            head = node;
+            if (head == null) {
+                head = new Node();
+                head.timestampMs = timeMs;
+            } else if (head.timestampMs != timeMs) {
+                Node node = new Node();
+                node.timestampMs = timeMs;
+                node.next = head;
+                head = node;
+            }
+
+            if (datapoint.value > head.maximum) {
+                head.maximum = datapoint.value;
+            }
+
+            if (datapoint.value < head.minimum) {
+                head.minimum = datapoint.value;
+            }
+
+            head.total += datapoint.value;
+            head.count++;
         }
 
         void aggregate(NewDatapointRepository repository, long timeMs) {
@@ -129,9 +149,9 @@ public class DatapointCollector {
             Node node = head;
             Node previous = null;
             while (node != null) {
-                Datapoint d = node.value;
-                if (d.timestampMs < maxTime) {
-                    if (timeMs - d.timestampMs > maximumRollupMs) {
+
+                if (node.timestampMs < maxTime) {
+                    if (timeMs - node.timestampMs > maximumRollupMs) {
                         if (previous == null) {
                             head = null;
                         } else {
@@ -141,16 +161,16 @@ public class DatapointCollector {
                     break;
                 }
 
-                if (d.value > maxvalue) {
-                    maxvalue = d.value;
+                if (node.maximum > maxvalue) {
+                    maxvalue = node.maximum;
                 }
 
-                if (d.value < minvalue) {
-                    minvalue = d.value;
+                if (node.minimum < minvalue) {
+                    minvalue = node.minimum;
                 }
 
-                items++;
-                sum += d.value;
+                items+=node.count;
+                sum += node.total;
                 previous = node;
                 node = node.next;
             }
@@ -174,7 +194,7 @@ public class DatapointCollector {
 
     private Map<String, Aggregator> aggregators = new HashMap<String, Aggregator>();
 
-    public void flush(long timeStamp) {
+    public void flush(long timeMs) {
         List<Datapoint> rawDatapoints = dataPointsRef.getAndSet(new Vector<Datapoint>());
         if (rawDatapoints.isEmpty()) {
             return;
@@ -187,19 +207,19 @@ public class DatapointCollector {
             //Datapoint idAgnosticDatapoint = new Datapoint(datapoint);
             //idAgnosticDatapoint.id="";
 
-            x(datapoint);
+            x(datapoint,timeMs);
             //x(memberAgnosticDatapoint);
             //x(idAgnosticDatapoint);
         }
 
         for (Aggregator aggregator : aggregators.values()) {
             for (NewDatapointRepository repository : repositories) {
-                aggregator.aggregate(repository, timeStamp);
+                aggregator.aggregate(repository, timeMs);
             }
         }
     }
 
-    private void x(Datapoint datapoint) {
+    private void x(Datapoint datapoint, long timeMs) {
         String key = id(datapoint);
 
         Aggregator calculator = aggregators.get(key);
@@ -208,7 +228,7 @@ public class DatapointCollector {
             aggregators.put(key, calculator);
         }
 
-        calculator.publish(datapoint);
+        calculator.publish(datapoint,timeMs);
     }
 
     private String id(Datapoint datapoint) {

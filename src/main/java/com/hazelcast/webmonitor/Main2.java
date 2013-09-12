@@ -57,8 +57,8 @@ public class Main2 {
         //System.out.println("min Per 10 seconds");
         //print(collector.getRepository(10).slice("min(IMap.readCount)", startTimeMs, endTimeMs));
 
-        //System.out.println("avg Per 10 seconds");
-        //print(collector.getRepository(10).slice("avg(IMap.readCount)", startTimeMs, endTimeMs));
+        System.out.println("avg Per 10 seconds");
+        print(collector.getRepository(10).slice("avg(IMap.readCount)", startTimeMs, endTimeMs));
 
         //System.out.println("max Per 30 seconds");
         //print(collector.getRepository(30).slice("max(IMap.readCount)", startTimeMs, endTimeMs));
