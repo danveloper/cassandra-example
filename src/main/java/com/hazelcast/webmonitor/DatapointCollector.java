@@ -1,6 +1,6 @@
-package com.hazelcast.webmonitor.newdatapoint;
+package com.hazelcast.webmonitor;
 
-import com.hazelcast.webmonitor.Measurement;
+import com.hazelcast.webmonitor.model.Datapoint;
 import com.hazelcast.webmonitor.repositories.DatapointRepository;
 import me.prettyprint.hector.api.Cluster;
 import me.prettyprint.hector.api.Keyspace;

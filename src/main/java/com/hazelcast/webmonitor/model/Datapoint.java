@@ -1,4 +1,4 @@
-package com.hazelcast.webmonitor.newdatapoint;
+package com.hazelcast.webmonitor.model;
 
 public class Datapoint {
     public String metricName;

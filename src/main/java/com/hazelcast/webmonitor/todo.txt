@@ -1,20 +1,9 @@
 TODO:
 
-- when a timeseries is aggregated, there is only information available about the time period and not about the previous
-period. This is problematic if there are only 1 datapoint. It also is problematic for the first datapoint.
-
 - compression of active members, servers
 
+
 QUESTIONS:
-
-- can a value store a composite instead of a primitive: also a composite could be stored as value
-
-- use the data point technique with tags.
-
-- do you want to have a chain of column families for every 'function' e.g.
-    avg-1-second, avg-5-second,avg-30-second
-  of do you want a:
-    1-second, 5-second, 30-second
 
 - how to figure out which metrics are available
     - in total
@@ -25,6 +14,9 @@ QUESTIONS:
    this could be calculated based on the raw data.
 
 DONE
+
+- company and env need to be added to the row key
+    - the should be removed from the column key
 
 - need a list of active clusters
 
