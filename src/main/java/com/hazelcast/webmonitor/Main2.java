@@ -26,21 +26,21 @@ public class Main2 {
         for (int k = 0; k < 3000; k++) {
             Thread.sleep(100);
 
-            Datapoint datapoint = new Datapoint();
-            datapoint.metricName = "IMap.readCount";
-            datapoint.timestampMs = System.currentTimeMillis();
-            datapoint.cluster = "dev";
+            Measurement measurement = new Measurement();
+            measurement.metricName = "IMap.readCount";
+            measurement.timestampMs = System.currentTimeMillis();
+            measurement.cluster = "dev";
             if (k % 2 == 1) {
-                datapoint.value = Math.round(500 + 200 * Math.sin(k / 100.0));
-                datapoint.member = "192.168.1.1";
+                measurement.value = Math.round(500 + 200 * Math.sin(k / 100.0));
+                measurement.member = "192.168.1.1";
             } else {
-                datapoint.value = Math.round(500 + 200 * Math.cos(k / 100.0));
-                datapoint.member = "192.168.1.2";
+                measurement.value = Math.round(500 + 200 * Math.cos(k / 100.0));
+                measurement.member = "192.168.1.2";
             }
-            datapoint.id = "map1";
-            datapoint.company = "hazelcast";
+            measurement.id = "map1";
+            measurement.company = "hazelcast";
 
-            collector.publish(datapoint);
+            collector.publish(measurement);
             System.out.println("Published " + k);
         }
         long endTimeMs = System.currentTimeMillis();

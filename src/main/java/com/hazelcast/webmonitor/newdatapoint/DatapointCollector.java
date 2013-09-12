@@ -1,5 +1,6 @@
 package com.hazelcast.webmonitor.newdatapoint;
 
+import com.hazelcast.webmonitor.Measurement;
 import com.hazelcast.webmonitor.repositories.DatapointRepository;
 import me.prettyprint.hector.api.Cluster;
 import me.prettyprint.hector.api.Keyspace;
@@ -15,16 +16,14 @@ import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * todo:
- * - max aggregator has a memory leak since it will keep track of all datapoints
  * - no parallellisation
- * - merge min/max/avg into single value
  * - max aggregators items are never removed.. so also a potential OOME.
  */
 public class DatapointCollector {
 
     private final DatapointRepository[] repositories;
 
-    private final AtomicReference<List<Datapoint>> dataPointsRef = new AtomicReference<List<Datapoint>>(new Vector<Datapoint>());
+    private final AtomicReference<List<Measurement>> dataPointsRef = new AtomicReference<List<Measurement>>(new Vector<Measurement>());
 
     private final long maximumRollupMs;
 
@@ -61,8 +60,8 @@ public class DatapointCollector {
         return null;
     }
 
-    public void publish(Datapoint datapoint) {
-        dataPointsRef.get().add(datapoint);
+    public void publish(Measurement measurement) {
+        dataPointsRef.get().add(measurement);
     }
 
     public void start() {
@@ -111,9 +110,14 @@ public class DatapointCollector {
         private Datapoint template;
         private Node head;
 
-        void publish(Datapoint datapoint, long timeMs) {
+        void publish(Measurement datapoint, long timeMs) {
             if (template == null) {
-                template = new Datapoint(datapoint);
+                template = new Datapoint();
+                template.metricName = datapoint.metricName;
+                template.member = datapoint.member;
+                template.cluster = datapoint.cluster;
+                template.company = datapoint.company;
+                template.id = datapoint.id;
             }
 
             if (head == null) {
@@ -179,16 +183,10 @@ public class DatapointCollector {
             Datapoint result = new Datapoint(template);
             result.timestampMs = timeMs;
 
-            result.metricName = "max(" + template.metricName + ")";
-            result.value = maxvalue;
-            repository.insert(result);
-
-            result.metricName = "min(" + template.metricName + ")";
-            result.value = minvalue;
-            repository.insert(result);
-
-            result.value = items == 0 ? 0 : sum / items;
-            result.metricName = "avg(" + template.metricName + ")";
+            result.metricName = template.metricName;
+            result.maximum = maxvalue;
+            result.minimum = minvalue;
+            result.avg = items == 0 ? 0 : sum / items;
             repository.insert(result);
         }
     }
@@ -196,12 +194,12 @@ public class DatapointCollector {
     private Map<String, Aggregator> aggregators = new HashMap<String, Aggregator>();
 
     public void flush(long timeMs) {
-        List<Datapoint> rawDatapoints = dataPointsRef.getAndSet(new Vector<Datapoint>());
+        List<Measurement> rawDatapoints = dataPointsRef.getAndSet(new Vector<Measurement>());
         if (rawDatapoints.isEmpty()) {
             return;
         }
 
-        for (Datapoint datapoint : rawDatapoints) {
+        for (Measurement datapoint : rawDatapoints) {
             //Datapoint memberAgnosticDatapoint = new Datapoint(datapoint);
             //memberAgnosticDatapoint.member="";
 
@@ -220,7 +218,7 @@ public class DatapointCollector {
         }
     }
 
-    private void x(Datapoint datapoint, long timeMs) {
+    private void x(Measurement datapoint, long timeMs) {
         String key = id(datapoint);
 
         Aggregator calculator = aggregators.get(key);
@@ -232,7 +230,7 @@ public class DatapointCollector {
         calculator.publish(datapoint,timeMs);
     }
 
-    private String id(Datapoint datapoint) {
+    private String id(Measurement datapoint) {
         return datapoint.company + "!" + datapoint.cluster + "!" + datapoint.member + "!" + datapoint.id + "!" + datapoint.metricName;
     }
 

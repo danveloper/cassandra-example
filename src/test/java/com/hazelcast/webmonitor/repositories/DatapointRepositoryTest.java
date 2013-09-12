@@ -29,6 +29,11 @@ public class DatapointRepositoryTest extends AbstractRepositoryTest {
         List<Datapoint> result = datapointRepository.slice(datapoint.metricName, datapoint.timestampMs - 1, datapoint.timestampMs + 1);
 
         assertEquals(1, result.size());
+
+        System.out.println(datapoint);
+
+        System.out.println(result.get(0));
+
         assertTrue(result.contains(datapoint));
     }
 
@@ -59,7 +64,9 @@ public class DatapointRepositoryTest extends AbstractRepositoryTest {
     public Datapoint createDatapoint() {
         Datapoint datapoint = new Datapoint();
         datapoint.metricName = "IMap.readCount";
-        datapoint.value = 500;
+        datapoint.maximum = 500;
+        datapoint.minimum = 200;
+        datapoint.avg = 10;
         datapoint.timestampMs = System.currentTimeMillis();
         datapoint.cluster = "dev";
         datapoint.member = "192.168.1.1";
