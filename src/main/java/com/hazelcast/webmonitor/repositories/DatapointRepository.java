@@ -54,7 +54,7 @@ public class DatapointRepository extends AbstractRepository {
         cf.setKeyValidationClass(ComparatorType.UTF8TYPE.getClassName());
         //Defines how to store, compare and validate the column names
         //first element is timestamp, second element is member, third element is the id
-        cf.setComparatorTypeAlias("(LongType, UTF8Type, UTF8Type, UTF8Type, UTF8Type, LongType)");
+        cf.setComparatorTypeAlias("(LongType, UTF8Type, UTF8Type, UTF8Type, UTF8Type)");
         //Validator to use for values in columns
         cf.setDefaultValidationClass(ComparatorType.LONGTYPE.getClassName());
 
@@ -76,8 +76,6 @@ public class DatapointRepository extends AbstractRepository {
         columnKey.addComponent(datapoint.id, StringSerializer.get());
         columnKey.addComponent(datapoint.company, StringSerializer.get());
         columnKey.addComponent(datapoint.cluster, StringSerializer.get());
-        //todo:this should not be needed but currently I'm not able to convert the first column back to a timestamp
-        columnKey.addComponent(timeMs, LongSerializer.get());
 
         Mutator<String> mutator = createMutator(keyspace, StringSerializer.get());
         HColumn<Composite, Long> column = HFactory.createColumn(
@@ -149,13 +147,11 @@ public class DatapointRepository extends AbstractRepository {
         datapoint.metricName = metricName;
 
         datapoint.value = hcolumn.getValue();
-
+        datapoint.timestampMs = column.get(0, LongSerializer.get());
         datapoint.member = column.get(1, StringSerializer.get());
         datapoint.id = column.get(2, StringSerializer.get());
         datapoint.company = column.get(3, StringSerializer.get());
         datapoint.cluster = column.get(4, StringSerializer.get());
-        //todo: delete once we are able to retrieve time from first column
-        datapoint.timestampMs = column.get(5, LongSerializer.get());
         return datapoint;
     }
 
