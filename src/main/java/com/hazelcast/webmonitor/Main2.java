@@ -17,7 +17,7 @@ public class Main2 {
     public static void main(String[] args) throws Exception {
         Cluster cluster = HFactory.getOrCreateCluster("test-cluster", "localhost:9160");
         Keyspace keyspace = createKeyspace(cluster, "Measurements");
-        DatapointCollector collector = new DatapointCollector(cluster, keyspace, new int[]{1, 5, 10, 30});
+        DatapointCollector collector = new DatapointCollector(cluster, keyspace, new int[]{1,5,10});
         collector.start();
 
         String metricName = "IMap.readCount";
@@ -48,21 +48,20 @@ public class Main2 {
         System.out.println("max Per 1 seconds");
         print(collector.getRepository(1).slice("max(IMap.readCount)", startTimeMs, endTimeMs));
 
-        System.out.println("max Per 5 seconds");
-        print(collector.getRepository(5).slice("max(IMap.readCount)", startTimeMs, endTimeMs));
+//        System.out.println("max Per 5 seconds");
+//        print(collector.getRepository(5).slice("max(IMap.readCount)", startTimeMs, endTimeMs));
 
-        System.out.println("max Per 10 seconds");
-        print(collector.getRepository(10).slice("max(IMap.readCount)", startTimeMs, endTimeMs));
+        //System.out.println("max Per 10 seconds");
+        //print(collector.getRepository(10).slice("max(IMap.readCount)", startTimeMs, endTimeMs));
 
-        System.out.println("min Per 10 seconds");
-        print(collector.getRepository(10).slice("min(IMap.readCount)", startTimeMs, endTimeMs));
+        //System.out.println("min Per 10 seconds");
+        //print(collector.getRepository(10).slice("min(IMap.readCount)", startTimeMs, endTimeMs));
 
-        System.out.println("avg Per 10 seconds");
-        print(collector.getRepository(10).slice("avg(IMap.readCount)", startTimeMs, endTimeMs));
+        //System.out.println("avg Per 10 seconds");
+        //print(collector.getRepository(10).slice("avg(IMap.readCount)", startTimeMs, endTimeMs));
 
-        System.out.println("max Per 30 seconds");
-        print(collector.getRepository(30).slice("max(IMap.readCount)", startTimeMs, endTimeMs));
-
+        //System.out.println("max Per 30 seconds");
+        //print(collector.getRepository(30).slice("max(IMap.readCount)", startTimeMs, endTimeMs));
 
         System.exit(0);
     }

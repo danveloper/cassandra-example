@@ -3,7 +3,10 @@ package com.hazelcast.webmonitor.newdatapoint;
 import me.prettyprint.hector.api.Cluster;
 import me.prettyprint.hector.api.Keyspace;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Vector;
 import java.util.concurrent.atomic.AtomicReference;
 
 
@@ -24,14 +27,13 @@ public class DatapointCollector {
 
     private final long maximumRollupMs;
 
-
     public DatapointCollector(Cluster cluster, Keyspace keyspace, int[] rollupPeriods) {
         if (rollupPeriods.length == 0) {
             throw new IllegalArgumentException();
         }
 
         repositories = new NewDatapointRepository[rollupPeriods.length];
-        long maximumRollupMs = Long.MAX_VALUE;
+        long maximumRollupMs = Long.MIN_VALUE;
 
         for (int k = 0; k < repositories.length; k++) {
             int rollupPeriodSeconds = rollupPeriods[k];
@@ -58,20 +60,24 @@ public class DatapointCollector {
         return null;
     }
 
+    public void publish(Datapoint datapoint) {
+        dataPointsRef.get().add(datapoint);
+    }
+
     public void start() {
         new Thread() {
             public void run() {
                 long sleepMs = 1000;
                 try {
                     for (; ; ) {
-                        dosleep(sleepMs);
+                        doSleep(sleepMs);
 
                         long startMs = System.currentTimeMillis();
                         flush(startMs);
                         long endMs = System.currentTimeMillis();
-                        long durationMs = endMs-startMs;
-                        sleepMs = 1000-durationMs;
-                        if(sleepMs<0){
+                        long durationMs = endMs - startMs;
+                        sleepMs = 1000 - durationMs;
+                        if (sleepMs < 0) {
                             //todo
                             System.out.println("Expired");
                         }
@@ -80,98 +86,89 @@ public class DatapointCollector {
                     e.printStackTrace();
                 }
             }
-
-
         }.start();
     }
 
-    private static void dosleep(long sleepMs) {
+    private static void doSleep(long sleepMs) {
         try {
             Thread.sleep(sleepMs);
         } catch (InterruptedException e) {
-            e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
         }
+    }
+
+    static class Node {
+        Node next;
+        Datapoint value;
     }
 
     class Aggregator {
 
         private Datapoint template;
-        private LinkedList<Datapoint> list = new LinkedList();
+        private Node head;
 
         void publish(Datapoint datapoint) {
             if (template == null) {
                 template = new Datapoint(datapoint);
             }
-            list.offerFirst(datapoint);
+
+            Node node = new Node();
+            node.value = datapoint;
+            node.next = head;
+            head = node;
         }
 
-        Datapoint calcMax(long timestampMs, long rollupPeriodMs) {
-            Datapoint result = new Datapoint(template);
+        void aggregate(NewDatapointRepository repository, long timeMs) {
+            long rollupPeriodMs = repository.getRollupPeriodMs();
             long maxTime = System.currentTimeMillis() - rollupPeriodMs;
 
             long maxvalue = Long.MIN_VALUE;
-            for (int k = 0; k < list.size(); k++) {
-                Datapoint d = list.get(k);
+            long minvalue = Long.MAX_VALUE;
+            int items = 0;
+            long sum = 0;
 
+            Node node = head;
+            Node previous = null;
+            while (node != null) {
+                Datapoint d = node.value;
                 if (d.timestampMs < maxTime) {
+                    if (timeMs - d.timestampMs > maximumRollupMs) {
+                        if (previous == null) {
+                            head = null;
+                        } else {
+                            previous.next = null;
+                        }
+                    }
                     break;
                 }
 
                 if (d.value > maxvalue) {
                     maxvalue = d.value;
                 }
-            }
-
-            result.metricName = "max(" + template.metricName + ")";
-            result.timestampMs = rollupPeriodMs * (timestampMs / rollupPeriodMs);
-            result.value = maxvalue;
-            return result;
-        }
-
-        Datapoint calcMin(long timestampMs, long rollupPeriodMs) {
-            Datapoint result = new Datapoint(template);
-            long maxTime = System.currentTimeMillis() - rollupPeriodMs;
-
-            long minvalue = Long.MAX_VALUE;
-            for (int k = 0; k < list.size(); k++) {
-                Datapoint d = list.get(k);
-
-                if (d.timestampMs < maxTime) {
-                    break;
-                }
 
                 if (d.value < minvalue) {
                     minvalue = d.value;
                 }
-            }
 
-            result.metricName = "min(" + template.metricName + ")";
-            result.timestampMs = rollupPeriodMs * (timestampMs / rollupPeriodMs);
-            result.value = minvalue;
-            return result;
-        }
-
-        Datapoint calcAvg(long timestampMs, long rollupPeriodMs) {
-            Datapoint result = new Datapoint(template);
-            long maxTime = System.currentTimeMillis() - rollupPeriodMs;
-
-            int items = 0;
-            long sum = 0;
-            for (int k = 0; k < list.size(); k++) {
-                Datapoint d = list.get(k);
-
-                if (d.timestampMs < maxTime) {
-                    break;
-                }
                 items++;
                 sum += d.value;
-
+                previous = node;
+                node = node.next;
             }
 
-            result.metricName = "avg(" + template.metricName + ")";
-            result.timestampMs = rollupPeriodMs * (timestampMs / rollupPeriodMs);
+            Datapoint result = new Datapoint(template);
+            result.timestampMs = timeMs;
+
+            result.metricName = "max(" + template.metricName + ")";
+            result.value = maxvalue;
+            repository.insert(result);
+
+            result.metricName = "min(" + template.metricName + ")";
+            result.value = minvalue;
+            repository.insert(result);
+
             result.value = items == 0 ? 0 : sum / items;
-            return result;
+            result.metricName = "avg(" + template.metricName + ")";
+            repository.insert(result);
         }
     }
 
@@ -195,11 +192,9 @@ public class DatapointCollector {
             //x(idAgnosticDatapoint);
         }
 
-        for (Aggregator collector : aggregators.values()) {
+        for (Aggregator aggregator : aggregators.values()) {
             for (NewDatapointRepository repository : repositories) {
-                repository.insert(collector.calcMax(timeStamp, repository.getRollupPeriodMs()));
-                repository.insert(collector.calcMin(timeStamp, repository.getRollupPeriodMs()));
-                repository.insert(collector.calcAvg(timeStamp, repository.getRollupPeriodMs()));
+                aggregator.aggregate(repository, timeStamp);
             }
         }
     }
@@ -220,7 +215,5 @@ public class DatapointCollector {
         return datapoint.company + "!" + datapoint.cluster + "!" + datapoint.member + "!" + datapoint.id + "!" + datapoint.metricName;
     }
 
-    public void publish(Datapoint datapoint) {
-        dataPointsRef.get().add(datapoint);
-    }
+
 }
