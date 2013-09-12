@@ -1,6 +1,6 @@
-package com.hazelcast.webmonitor.repositories;
+package com.hazelcast.webmonitor.datapoints;
 
-import com.hazelcast.webmonitor.model.Datapoint;
+import com.hazelcast.webmonitor.repositories.AbstractRepository;
 import me.prettyprint.cassandra.serializers.BytesArraySerializer;
 import me.prettyprint.cassandra.serializers.CompositeSerializer;
 import me.prettyprint.cassandra.serializers.LongSerializer;
@@ -74,9 +74,9 @@ public class DatapointRepository extends AbstractRepository {
         columnKey.addComponent(datapoint.id, StringSerializer.get());
 
         ByteBuffer value = ByteBuffer.allocate(3 * LONG_SIZE);
-        value.putLong(0, datapoint.maximum);
-        value.putLong(LONG_SIZE, datapoint.minimum);
-        value.putLong(2 * LONG_SIZE, datapoint.avg);
+        value.putDouble(0, datapoint.maximum);
+        value.putDouble(LONG_SIZE, datapoint.minimum);
+        value.putDouble(2 * LONG_SIZE, datapoint.avg);
 
         Mutator<Composite> mutator = createMutator(keyspace, CompositeSerializer.get());
         HColumn<Composite, byte[]> column = HFactory.createColumn(
@@ -96,21 +96,49 @@ public class DatapointRepository extends AbstractRepository {
         return rowKey;
     }
 
-    public List<Datapoint> slice(String company, String cluster, String metricName, long startMs, long endMs) {
+    public List<Datapoint> slice(DatapointQuery query) {
+        return slice(query.company, query.cluster, query.member, query.id, query.metric, query.beginMs, query.endMs, query.maxResult);
+    }
+
+    public List<Datapoint> slice(String company, String cluster, String member, String id, String metricName, long startMs, long endMs) {
+        return slice(company, cluster, member, id, metricName, startMs, endMs, Integer.MAX_VALUE);
+    }
+
+    public List<Datapoint> slice(String company, String cluster, String member, String id, String metricName, long startMs, long endMs, int maxResult) {
         Composite rowKey = createRowKey(company, cluster, metricName);
 
         Composite begin = new Composite();
         begin.addComponent(startMs, LongSerializer.get());
+        if (member == null) {
+            begin.addComponent(AbstractRepository.begin, StringSerializer.get());
+        } else {
+            begin.addComponent(member, StringSerializer.get());
+        }
+        if (id == null) {
+            begin.addComponent(AbstractRepository.begin, StringSerializer.get());
+        } else {
+            begin.addComponent(id, StringSerializer.get());
+        }
 
         Composite end = new Composite();
         end.addComponent(endMs, LongSerializer.get());
+        if (member == null) {
+            end.addComponent(AbstractRepository.end, StringSerializer.get());
+        } else {
+            end.addComponent(member, StringSerializer.get());
+        }
+        if (id == null) {
+            end.addComponent(AbstractRepository.end, StringSerializer.get());
+        } else {
+            end.addComponent(id, StringSerializer.get());
+        }
 
         SliceQuery<Composite, Composite, byte[]> query = createSliceQuery(keyspace, CompositeSerializer.get(),
                 CompositeSerializer.get(),
                 BytesArraySerializer.get());
         query.setColumnFamily(cf.getName());
         query.setKey(rowKey);
-        query.setRange(begin, end, false, Integer.MAX_VALUE);
+        query.setRange(begin, end, false, maxResult);
 
         Iterator<HColumn<Composite, byte[]>> iterator = query.execute().get().getColumns().iterator();
         List<Datapoint> result = new LinkedList<Datapoint>();
@@ -121,49 +149,25 @@ public class DatapointRepository extends AbstractRepository {
         return result;
     }
 
-    public List<Datapoint> sliceForMember(String company, String cluster, String metricName, String member, long startMs, long endMs) {
-        Composite rowKey = createRowKey(company, cluster, metricName);
-
-        Composite begin = new Composite();
-        begin.addComponent(startMs, LongSerializer.get());
-        begin.addComponent(member, StringSerializer.get());
-
-        Composite end = new Composite();
-        end.addComponent(endMs, LongSerializer.get());
-        end.addComponent(member, StringSerializer.get());
-
-        SliceQuery<Composite, Composite, byte[]> query = createSliceQuery(keyspace, CompositeSerializer.get(),
-                CompositeSerializer.get(),
-                BytesArraySerializer.get());
-        query.setColumnFamily(cf.getName());
-        query.setKey(rowKey);
-        query.setRange(begin, end, false, Integer.MAX_VALUE);
-
-        Iterator<HColumn<Composite, byte[]>> iterator = query.execute().get().getColumns().iterator();
-        LinkedList<Datapoint> result = new LinkedList<Datapoint>();
-        while (iterator.hasNext()) {
-            Datapoint datapoint = getDatapoint(company, cluster, metricName, iterator.next());
-            result.add(datapoint);
-        }
-        return result;
-    }
-
 
     private Datapoint getDatapoint(String company, String cluster, String metricName, HColumn<Composite, byte[]> hcolumn) {
-        Composite column = hcolumn.getName();
         Datapoint datapoint = new Datapoint();
         datapoint.metricName = metricName;
+        datapoint.company = company;
+        datapoint.cluster = cluster;
 
-        ByteBuffer byteBuffer = ByteBuffer.wrap(hcolumn.getValue());
-        datapoint.maximum = byteBuffer.getLong(0);
-        datapoint.minimum = byteBuffer.getLong(LONG_SIZE);
-        datapoint.avg = byteBuffer.getLong(2 * LONG_SIZE);
-
+        //retrieve state from the column-names
+        Composite column = hcolumn.getName();
         datapoint.timestampMs = column.get(0, LongSerializer.get());
         datapoint.member = column.get(1, StringSerializer.get());
         datapoint.id = column.get(2, StringSerializer.get());
-        datapoint.company = company;
-        datapoint.cluster = cluster;
+
+        //retrieve state from the value
+        ByteBuffer byteBuffer = ByteBuffer.wrap(hcolumn.getValue());
+        datapoint.maximum = byteBuffer.getDouble(0);
+        datapoint.minimum = byteBuffer.getDouble(LONG_SIZE);
+        datapoint.avg = byteBuffer.getDouble(2 * LONG_SIZE);
+
         return datapoint;
     }
 }

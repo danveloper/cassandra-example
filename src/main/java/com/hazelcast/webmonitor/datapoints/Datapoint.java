@@ -1,4 +1,4 @@
-package com.hazelcast.webmonitor.model;
+package com.hazelcast.webmonitor.datapoints;
 
 public class Datapoint {
     public String metricName;
@@ -9,9 +9,9 @@ public class Datapoint {
     public String id;
     public String company;
 
-    public long minimum;
-    public long maximum;
-    public long avg;
+    public double minimum;
+    public double maximum;
+    public double avg;
 
     public Datapoint() {
     }
@@ -20,7 +20,7 @@ public class Datapoint {
         this(datapoint.metricName,datapoint.timestampMs,datapoint.cluster,datapoint.member,datapoint.id,datapoint.company,datapoint.minimum,datapoint.maximum,datapoint.avg);
     }
 
-    public Datapoint(String metricName, long timestampMs, String cluster, String member, String id, String company, long minimum, long maximum, long avg) {
+    public Datapoint(String metricName, long timestampMs, String cluster, String member, String id, String company, double minimum, double maximum, double avg) {
         this.metricName = metricName;
         this.timestampMs = timestampMs;
         this.cluster = cluster;
@@ -54,9 +54,9 @@ public class Datapoint {
 
         Datapoint datapoint = (Datapoint) o;
 
-        if (avg != datapoint.avg) return false;
-        if (maximum != datapoint.maximum) return false;
-        if (minimum != datapoint.minimum) return false;
+        if (Double.compare(datapoint.avg, avg) != 0) return false;
+        if (Double.compare(datapoint.maximum, maximum) != 0) return false;
+        if (Double.compare(datapoint.minimum, minimum) != 0) return false;
         if (timestampMs != datapoint.timestampMs) return false;
         if (cluster != null ? !cluster.equals(datapoint.cluster) : datapoint.cluster != null) return false;
         if (company != null ? !company.equals(datapoint.company) : datapoint.company != null) return false;
@@ -69,15 +69,20 @@ public class Datapoint {
 
     @Override
     public int hashCode() {
-        int result = metricName != null ? metricName.hashCode() : 0;
+        int result;
+        long temp;
+        result = metricName != null ? metricName.hashCode() : 0;
         result = 31 * result + (int) (timestampMs ^ (timestampMs >>> 32));
         result = 31 * result + (cluster != null ? cluster.hashCode() : 0);
         result = 31 * result + (member != null ? member.hashCode() : 0);
         result = 31 * result + (id != null ? id.hashCode() : 0);
         result = 31 * result + (company != null ? company.hashCode() : 0);
-        result = 31 * result + (int) (minimum ^ (minimum >>> 32));
-        result = 31 * result + (int) (maximum ^ (maximum >>> 32));
-        result = 31 * result + (int) (avg ^ (avg >>> 32));
+        temp = Double.doubleToLongBits(minimum);
+        result = 31 * result + (int) (temp ^ (temp >>> 32));
+        temp = Double.doubleToLongBits(maximum);
+        result = 31 * result + (int) (temp ^ (temp >>> 32));
+        temp = Double.doubleToLongBits(avg);
+        result = 31 * result + (int) (temp ^ (temp >>> 32));
         return result;
     }
 }

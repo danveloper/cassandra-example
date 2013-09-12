@@ -1,7 +1,6 @@
-package com.hazelcast.webmonitor;
+package com.hazelcast.webmonitor.datapoints;
 
-import com.hazelcast.webmonitor.model.Datapoint;
-import com.hazelcast.webmonitor.repositories.DatapointRepository;
+import com.hazelcast.webmonitor.Measurement;
 import me.prettyprint.hector.api.Cluster;
 import me.prettyprint.hector.api.Keyspace;
 
@@ -15,9 +14,6 @@ import java.util.concurrent.atomic.AtomicReference;
 //based on the incoming time they could be placed in their own bucket.
 
 /**
- * todo:
- * - no parallellisation
- * - max aggregators items are never removed.. so also a potential OOME.
  */
 public class DatapointCollector {
 
@@ -99,10 +95,10 @@ public class DatapointCollector {
     static class Node {
         Node next;
         long timestampMs;
-        long maximum = Long.MIN_VALUE;
-        long minimum = Long.MAX_VALUE;
+        double maximum = Double.MIN_VALUE;
+        double minimum = Double.MAX_VALUE;
         long count;
-        long total;
+        double total;
     }
 
     class Aggregator {
@@ -146,15 +142,14 @@ public class DatapointCollector {
             long rollupPeriodMs = repository.getRollupPeriodMs();
             long maxTime = System.currentTimeMillis() - rollupPeriodMs;
 
-            long maxvalue = Long.MIN_VALUE;
-            long minvalue = Long.MAX_VALUE;
+            double maxvalue = Long.MIN_VALUE;
+            double minvalue = Long.MAX_VALUE;
             int items = 0;
-            long sum = 0;
+            double sum = 0;
 
             Node node = head;
             Node previous = null;
             while (node != null) {
-
                 if (node.timestampMs < maxTime) {
                     if (timeMs - node.timestampMs > maximumRollupMs) {
                         if (previous == null) {

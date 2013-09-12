@@ -9,6 +9,9 @@ import java.util.List;
 
 public class AbstractRepository {
 
+    public final static String begin = Character.toString(Character.MIN_VALUE);
+    public final static String end = Character.toString(Character.MAX_VALUE);
+
     protected final Keyspace keyspace;
     protected final Cluster cluster;
 

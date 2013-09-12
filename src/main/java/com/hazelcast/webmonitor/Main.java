@@ -1,6 +1,8 @@
 package com.hazelcast.webmonitor;
 
-import com.hazelcast.webmonitor.model.Datapoint;
+import com.hazelcast.webmonitor.datapoints.Datapoint;
+import com.hazelcast.webmonitor.datapoints.DatapointCollector;
+import com.hazelcast.webmonitor.datapoints.DatapointQuery;
 import me.prettyprint.cassandra.service.ThriftKsDef;
 import me.prettyprint.hector.api.Cluster;
 import me.prettyprint.hector.api.Keyspace;
@@ -13,50 +15,78 @@ import java.util.List;
 
 public class Main {
 
+    public final static String readCountMeasurementName = "IMap.readCount";
+    public final static String totalReadLatencyMeasurementName = "IMap.totalReadLatency";
+    public final static String readLatencyMeasurementName = "IMap.readLatency";
+
     public static void main(String[] args) throws Exception {
         Cluster cluster = HFactory.getOrCreateCluster("test-cluster", "localhost:9160");
         Keyspace keyspace = createKeyspace(cluster, "Measurements");
-        DatapointCollector collector = new DatapointCollector(cluster, keyspace, new int[]{1,5,10,30});
+        DatapointCollector collector = new DatapointCollector(cluster, keyspace, new int[]{1, 5, 10, 30});
         collector.start();
 
-        String metricName = "IMap.readCount";
-
         long startTimeMs = System.currentTimeMillis();
+
+        generateMeasurements(collector);
+
+        long endTimeMs = System.currentTimeMillis();
+
+        DatapointQuery readCountQuery = new DatapointQuery();
+        readCountQuery.company = "hazelcast";
+        readCountQuery.cluster = "dev";
+        readCountQuery.id = "map1";
+        readCountQuery.metric = readCountMeasurementName;
+        readCountQuery.maxResult = Integer.MAX_VALUE;
+        readCountQuery.beginMs = startTimeMs;
+        readCountQuery.endMs = endTimeMs;
+
+        System.out.println("Per 1 seconds");
+        print(collector.getRepository(1).slice(readCountQuery));
+
+        System.out.println("Per 5 seconds");
+        print(collector.getRepository(5).slice(readCountQuery));
+
+        System.out.println("Per 10 seconds");
+        print(collector.getRepository(10).slice(readCountQuery));
+
+        DatapointQuery latencyQuery = new DatapointQuery(readCountQuery);
+        latencyQuery.metric = readCountMeasurementName;
+
+        System.out.println("Per 10 seconds");
+        print(collector.getRepository(10).slice(latencyQuery));
+
+        System.exit(0);
+    }
+
+    private static void generateMeasurements(DatapointCollector collector) throws InterruptedException {
+        long totalLatency = 0;
+        long totalReadCount = 0;
         for (int k = 0; k < 300; k++) {
             Thread.sleep(100);
 
-            Measurement measurement = new Measurement();
-            measurement.metricName = metricName;
-            measurement.timestampMs = System.currentTimeMillis();
-            measurement.cluster = "dev";
-            if (k % 2 == 1) {
-                measurement.value = Math.round(500 + 200 * Math.sin(k / 100.0));
-                measurement.member = "192.168.1.1";
-            } else {
-                measurement.value = Math.round(500 + 200 * Math.cos(k / 100.0));
-                measurement.member = "192.168.1.2";
-            }
-            measurement.id = "map1";
-            measurement.company = "hazelcast";
+            Measurement readCount = new Measurement();
+            readCount.metricName = readCountMeasurementName;
+            readCount.timestampMs = System.currentTimeMillis();
+            readCount.cluster = "dev";
 
-            collector.publish(measurement);
+            totalReadCount+=200 + Math.round(200 * Math.sin(k / 100.0));
+            readCount.value =totalReadCount;
+            readCount.member = "192.168.1.1";
+            readCount.id = "map1";
+            readCount.company = "hazelcast";
+
+            collector.publish(readCount);
+
+            totalLatency += 500 + 200 * Math.sin(k / 100.0);
+
+            Measurement readLatency = new Measurement(readCount);
+            readLatency.metricName = readLatencyMeasurementName;
+            readLatency.value += totalLatency / readCount.value;
+
+            collector.publish(readLatency);
+
             System.out.println("Published " + k);
         }
-        long endTimeMs = System.currentTimeMillis();
-
-        System.out.println("Per 1 seconds");
-        print(collector.getRepository(1).slice("hazelcast","dev",metricName, startTimeMs, endTimeMs));
-
-        System.out.println("Per 5 seconds");
-        print(collector.getRepository(5).slice("hazelcast","dev",metricName, startTimeMs, endTimeMs));
-
-        System.out.println("Per 10 seconds");
-        print(collector.getRepository(30).slice("hazelcast","dev",metricName, startTimeMs, endTimeMs));
-
-        System.out.println("Per 30 seconds");
-        print(collector.getRepository(30).slice("hazelcast","dev",metricName, startTimeMs, endTimeMs));
-
-        System.exit(0);
     }
 
     public static void print(List<Datapoint> datapoints) {

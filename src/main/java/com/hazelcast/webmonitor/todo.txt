@@ -2,6 +2,19 @@ TODO:
 
 - compression of active members, servers
 
+- no parallelisation
+
+- aggregators items are never removed.. so a potential OOME.
+
+- on restart, there is no history for the aggregators
+
+- aggregate on members
+
+- aggregate on id's
+
+- velocity
+
+- check how 'latency' fits in.
 
 QUESTIONS:
 
@@ -14,6 +27,8 @@ QUESTIONS:
    this could be calculated based on the raw data.
 
 DONE
+
+- values are now double.
 
 - company and env need to be added to the row key
     - the should be removed from the column key

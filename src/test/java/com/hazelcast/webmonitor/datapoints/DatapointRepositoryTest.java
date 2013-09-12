@@ -1,6 +1,8 @@
-package com.hazelcast.webmonitor.repositories;
+package com.hazelcast.webmonitor.datapoints;
 
-import com.hazelcast.webmonitor.model.Datapoint;
+import com.hazelcast.webmonitor.datapoints.DatapointRepository;
+import com.hazelcast.webmonitor.datapoints.Datapoint;
+import com.hazelcast.webmonitor.repositories.AbstractRepositoryTest;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -26,7 +28,7 @@ public class DatapointRepositoryTest extends AbstractRepositoryTest {
 
         System.out.println(datapoint);
 
-        List<Datapoint> result = datapointRepository.slice(datapoint.company,datapoint.cluster,datapoint.metricName, datapoint.timestampMs - 1, datapoint.timestampMs + 1);
+        List<Datapoint> result = datapointRepository.slice(datapoint.company,datapoint.cluster,null,datapoint.id,datapoint.metricName, datapoint.timestampMs - 1, datapoint.timestampMs + 1);
 
         assertEquals(1, result.size());
 
@@ -49,7 +51,7 @@ public class DatapointRepositoryTest extends AbstractRepositoryTest {
         datapointRepository.insert(datapoint1);
         datapointRepository.insert(datapoint1);
 
-        List<Datapoint> result = datapointRepository.sliceForMember(datapoint1.company,datapoint1.cluster,datapoint1.metricName, datapoint1.member, datapoint1.timestampMs - 1, datapoint1.timestampMs + 1);
+        List<Datapoint> result = datapointRepository.slice(datapoint1.company, datapoint1.cluster, datapoint1.member, null, datapoint1.metricName, datapoint1.timestampMs - 1, datapoint1.timestampMs + 1);
 
         assertEquals(1, result.size());
         assertTrue(result.contains(datapoint1));

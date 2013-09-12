@@ -31,7 +31,7 @@ public class CompanyRepository extends AbstractRepository {
     }
 
     public void save(String companyName) {
-         Mutator<String> mutator = createMutator(keyspace, StringSerializer.get());
+        Mutator<String> mutator = createMutator(keyspace, StringSerializer.get());
         HColumn<String, String> customerColumn = HFactory.createColumn(
                 companyName,
                 companyName,
