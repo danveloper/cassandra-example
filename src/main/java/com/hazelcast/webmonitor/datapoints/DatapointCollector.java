@@ -6,6 +6,8 @@ import me.prettyprint.hector.api.Keyspace;
 
 import java.util.List;
 import java.util.Vector;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicReference;
 
 
@@ -14,8 +16,9 @@ import java.util.concurrent.atomic.AtomicReference;
 public class DatapointCollector {
 
     private final DatapointRepository[] repositories;
-    private final AtomicReference<List<Measurement>> dataPointsRef = new AtomicReference<List<Measurement>>(new Vector<Measurement>());
-    private final long maximumRollupMs;
+    private final AtomicReference<List<Measurement>> measurementsRef = new AtomicReference<List<Measurement>>(new Vector<Measurement>());
+    final DatapointRepositoryProcessor[] processors;
+    final BlockingQueue<ProcessCommand>[] queues;
 
     public DatapointCollector(Cluster cluster, Keyspace keyspace, int[] rollupPeriods) {
         if (rollupPeriods.length == 0) {
@@ -23,7 +26,8 @@ public class DatapointCollector {
         }
 
         repositories = new DatapointRepository[rollupPeriods.length];
-        long maximumRollupMs = Long.MIN_VALUE;
+        processors = new DatapointRepositoryProcessor[repositories.length];
+        queues = new BlockingQueue[repositories.length];
 
         for (int k = 0; k < repositories.length; k++) {
             int rollupPeriodSeconds = rollupPeriods[k];
@@ -32,12 +36,15 @@ public class DatapointCollector {
             }
 
             int rollupPeriodMs = rollupPeriodSeconds * 1000;
-            if (rollupPeriodMs > maximumRollupMs) {
-                maximumRollupMs = rollupPeriodMs;
-            }
-            repositories[k] = new DatapointRepository(cluster, keyspace, "by_" + rollupPeriodSeconds + "_seconds", rollupPeriodMs);
+            DatapointRepository repository = new DatapointRepository(cluster, keyspace, "by_" + rollupPeriodSeconds + "_seconds", rollupPeriodMs);
+            repositories[k] = repository;
+
+            final BlockingQueue<ProcessCommand> queue = new LinkedBlockingQueue<ProcessCommand>();
+            queues[k] = queue;
+
+            final DatapointRepositoryProcessor scheduleRunnable = new DatapointRepositoryProcessor(repository);
+            processors[k] = scheduleRunnable;
         }
-        this.maximumRollupMs = maximumRollupMs;
     }
 
     public DatapointRepository getRepository(int rollupPeriod) {
@@ -51,16 +58,26 @@ public class DatapointCollector {
     }
 
     public void publish(Measurement measurement) {
-        dataPointsRef.get().add(measurement);
+        measurementsRef.get().add(measurement);
     }
 
     public void start() {
-        final DatapointRepositoryTask[] repositoryTasks = new DatapointRepositoryTask[repositories.length];
-        for (int k = 0; k < repositoryTasks.length; k++) {
-            DatapointRepository repository = repositories[k];
-            DatapointRepositoryTask scheduleRunnable = new DatapointRepositoryTask(repository);
-            repositoryTasks[k] = scheduleRunnable;
-            new Thread(scheduleRunnable).start();
+        for (int k = 0; k < processors.length; k++) {
+            final BlockingQueue<ProcessCommand> queue = queues[k];
+            final DatapointRepositoryProcessor processor = processors[k];
+
+            new Thread() {
+                public void run() {
+                    try {
+                        for (; ; ) {
+                            ProcessCommand command = queue.take();
+                            processor.process(command);
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+            }.start();
         }
 
         new Thread() {
@@ -71,14 +88,15 @@ public class DatapointCollector {
                     for (; ; ) {
                         doSleep(sleepMs);
 
-                        List<Measurement> measurements = dataPointsRef.getAndSet(new Vector<Measurement>());
-
+                        List<Measurement> measurements = measurementsRef.getAndSet(new Vector<Measurement>());
 
                         long startMs = System.currentTimeMillis();
                         ProcessCommand processCommand = new ProcessCommand(startMs, measurements);
-                        for (DatapointRepositoryTask repositoryTask : repositoryTasks) {
-                            repositoryTask.getMeasurementsQueue().add(processCommand);
+
+                        for (BlockingQueue<ProcessCommand> queue : queues) {
+                            queue.add(processCommand);
                         }
+
                         long endMs = System.currentTimeMillis();
                         long durationMs = endMs - startMs;
                         sleepMs = 1000 - durationMs;

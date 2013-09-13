@@ -5,35 +5,44 @@ import com.hazelcast.webmonitor.Measurement;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
 
-class DatapointRepositoryTask implements Runnable {
+class DatapointRepositoryProcessor {
     private final DatapointRepository repository;
     private final Map<String, Aggregator> aggregators = new HashMap<String, Aggregator>();
-    private final BlockingQueue<ProcessCommand> measurementsQueue = new LinkedBlockingQueue<ProcessCommand>();
+    private final int rollupPeriodMs;
+    private final int historyLength;
+    private final int timeMod;
 
-    DatapointRepositoryTask(DatapointRepository repository) {
+    DatapointRepositoryProcessor(DatapointRepository repository) {
         this.repository = repository;
-    }
+        this.rollupPeriodMs = repository.getRollupPeriodMs();
 
-    public BlockingQueue<ProcessCommand> getMeasurementsQueue() {
-        return measurementsQueue;
-    }
-
-    @Override
-    public void run() {
-        try {
-            for (; ; ) {
-                ProcessCommand command = measurementsQueue.take();
-                flush(command.getMeasurements(), command.getTimeMs());
+        if (rollupPeriodMs <= 10000) {
+            timeMod = 1000;
+        } else {
+            timeMod = rollupPeriodMs / 10000;
+            if(rollupPeriodMs%10000!=0){
+                throw new IllegalArgumentException("Illegal rollup period: "+rollupPeriodMs);
             }
-        } catch (Exception e) {
-            e.printStackTrace();
         }
+
+        this.historyLength = Math.min(10, (rollupPeriodMs / 1000) + 1);
     }
 
-    public void flush(List<Measurement> measurements, long timeMs) {
+    int getHistoryLength() {
+        return historyLength;
+    }
+
+    int rollupPeriodMs() {
+        return rollupPeriodMs;
+    }
+
+    public void process(ProcessCommand command) {
+        long timeMs = timeMod * (command.getTimeMs() / timeMod);
+        flush(command.getMeasurements(), timeMs);
+    }
+
+    private void flush(List<Measurement> measurements, long timeMs) {
         if (measurements.isEmpty()) {
             return;
         }
@@ -45,22 +54,22 @@ class DatapointRepositoryTask implements Runnable {
             //Datapoint idAgnosticDatapoint = new Datapoint(datapoint);
             //idAgnosticDatapoint.id="";
 
-            x(datapoint, timeMs);
-            //x(memberAgnosticDatapoint);
-            //x(idAgnosticDatapoint);
+            publish(datapoint, timeMs);
+            //publish(memberAgnosticDatapoint);
+            //publish(idAgnosticDatapoint);
         }
 
         for (Aggregator aggregator : aggregators.values()) {
-            aggregator.aggregate(repository, timeMs);
+            aggregator.aggregate(timeMs);
         }
     }
 
-    private void x(Measurement datapoint, long timeMs) {
+    private void publish(Measurement datapoint, long timeMs) {
         String key = id(datapoint);
 
         Aggregator calculator = aggregators.get(key);
         if (calculator == null) {
-            calculator = new Aggregator(repository.getRollupPeriodMs());
+            calculator = new Aggregator();
             aggregators.put(key, calculator);
         }
 
@@ -71,7 +80,7 @@ class DatapointRepositoryTask implements Runnable {
         return datapoint.company + "!" + datapoint.cluster + "!" + datapoint.member + "!" + datapoint.id + "!" + datapoint.metricName;
     }
 
-    static class Node {
+    private static class Node {
         Node next;
         long timestampMs;
         double maximum = Double.MIN_VALUE;
@@ -80,17 +89,12 @@ class DatapointRepositoryTask implements Runnable {
         double sum;
     }
 
-    static class Aggregator {
+    private class Aggregator {
 
         private Datapoint template;
         private Node head;
-        private final long maximumRollupMs;
 
-        Aggregator(long maximumRollupMs) {
-            this.maximumRollupMs = maximumRollupMs;
-        }
-
-        void publish(Measurement datapoint, long timeMs) {
+        private void publish(Measurement datapoint, long timeMs) {
             if (template == null) {
                 template = new Datapoint();
                 template.metricName = datapoint.metricName;
@@ -122,10 +126,7 @@ class DatapointRepositoryTask implements Runnable {
             head.count++;
         }
 
-        void aggregate(DatapointRepository repository, long timeMs) {
-            long rollupPeriodMs = repository.getRollupPeriodMs();
-            int seconds = ((int) rollupPeriodMs / 1000) + 1;
-
+        private void aggregate(long timeMs) {
             double maxvalue = Long.MIN_VALUE;
             double minvalue = Long.MAX_VALUE;
             int items = 0;
@@ -137,13 +138,11 @@ class DatapointRepositoryTask implements Runnable {
 
             int k = 0;
             while (node != null) {
-                if (k == seconds) {
-                    if (timeMs - node.timestampMs > maximumRollupMs) {
-                        if (previous == null) {
-                            head = null;
-                        } else {
-                            previous.next = null;
-                        }
+                if (k == historyLength + 1) {
+                    if (previous == null) {
+                        head = null;
+                    } else {
+                        previous.next = null;
                     }
                     break;
                 }

@@ -61,7 +61,7 @@ public class Main {
     private static void generateMeasurements(DatapointCollector collector) throws InterruptedException {
         long totalLatency = 0;
         long totalReadCount = 0;
-        for (int k = 0; k < 30; k++) {
+        for (int k = 0; k < 60; k++) {
             Thread.sleep(1000);
 
             Measurement readCount = new Measurement();
