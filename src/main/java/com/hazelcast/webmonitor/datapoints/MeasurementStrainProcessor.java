@@ -37,9 +37,13 @@ class MeasurementStrainProcessor {
         return rollupPeriodMs;
     }
 
-    public void process(MeasurementStrain strain) {
-        long timeMs = timeMod * (strain.getTimeMs() / timeMod);
-        flush(strain.getHead(), timeMs);
+    public void process(Measurement m, long timeMs) {
+        process(new MeasurementNode(null, m),timeMs);
+    }
+
+    public void process(MeasurementNode head, long timeMs) {
+        timeMs = timeMod * (timeMs / timeMod);
+        flush(head, timeMs);
     }
 
     private void flush(MeasurementNode head, long timeMs) {

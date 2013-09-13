@@ -53,22 +53,22 @@ public class MeasurementStrainProcessorTest extends AbstractRepositoryTest {
         measurement1.cluster="dev";
         measurement1.member="192.168.1.1:5701";
         measurement1.timestampMs=1000;
-        task.process(new MeasurementStrain(1000,measurement1));
+        task.process(measurement1,1000);
 
         Measurement measurement2 = new Measurement(measurement1);
         measurement2.timestampMs=2000;
         measurement2.value=20;
-        task.process(new MeasurementStrain(2000, measurement2));
+        task.process(measurement2,2000);
 
-        Measurement measurement3 = new Measurement(measurement1);
+        Measurement measurement3 = new Measurement(measurement2);
         measurement3.timestampMs=3000;
         measurement3.value=30;
-        task.process(new MeasurementStrain(3000, measurement3));
+        task.process(measurement3,3000);
 
         Measurement measurement4 = new Measurement(measurement1);
         measurement4.timestampMs=4000;
         measurement4.value=40;
-        task.process(new MeasurementStrain(4000,measurement4));
+        task.process(measurement4,4000);
 
         System.out.println("foo");
     }
@@ -86,22 +86,22 @@ public class MeasurementStrainProcessorTest extends AbstractRepositoryTest {
         measurement1.cluster="dev";
         measurement1.member="192.168.1.1:5701";
         measurement1.timestampMs=10000;
-        task.process(new MeasurementStrain(measurement1.timestampMs,measurement1));
+        task.process(measurement1, measurement1.timestampMs);
 
         Measurement measurement2 = new Measurement(measurement1);
         measurement2.timestampMs=20000;
         measurement2.value=20;
-        task.process(new MeasurementStrain(measurement2.timestampMs,measurement2));
+        task.process(measurement2,measurement2.timestampMs);
 
         Measurement measurement3 = new Measurement(measurement1);
         measurement3.timestampMs=30000;
         measurement3.value=30;
-        task.process(new MeasurementStrain(measurement3.timestampMs,measurement3));
+        task.process(measurement3,measurement3.timestampMs);
 
         Measurement measurement4 = new Measurement(measurement1);
         measurement4.timestampMs=40000;
         measurement4.value=40;
-        task.process(new MeasurementStrain(measurement4.timestampMs,measurement4));
+        task.process(measurement4,measurement4.timestampMs);
 
         System.out.println("foo");
     }

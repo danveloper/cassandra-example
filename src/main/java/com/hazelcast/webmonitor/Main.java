@@ -12,6 +12,10 @@ import me.prettyprint.hector.api.factory.HFactory;
 
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.Executor;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 public class Main {
 
@@ -22,7 +26,8 @@ public class Main {
     public static void main(String[] args) throws Exception {
         Cluster cluster = HFactory.getOrCreateCluster("test-cluster", "localhost:9160");
         Keyspace keyspace = createKeyspace(cluster, "Measurements");
-        MeasurementCollector collector = new MeasurementCollector(cluster, keyspace, new int[]{1, 5, 10, 30, 60});
+        Executor executor = new ThreadPoolExecutor(10,10,0, TimeUnit.SECONDS,new LinkedBlockingQueue<Runnable>());
+        MeasurementCollector collector = new MeasurementCollector(cluster, keyspace, new int[]{1, 5, 10, 30, 60},8,executor);
         collector.start();
 
         long startTimeMs = System.currentTimeMillis();
