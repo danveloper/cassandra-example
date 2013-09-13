@@ -8,19 +8,17 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Vector;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicReference;
 
 
 //based on the incoming time they could be placed in their own bucket.
 
-/**
- */
 public class DatapointCollector {
 
     private final DatapointRepository[] repositories;
-
     private final AtomicReference<List<Measurement>> dataPointsRef = new AtomicReference<List<Measurement>>(new Vector<Measurement>());
-
     private final long maximumRollupMs;
 
     public DatapointCollector(Cluster cluster, Keyspace keyspace, int[] rollupPeriods) {
@@ -61,15 +59,32 @@ public class DatapointCollector {
     }
 
     public void start() {
+        final DatapointRepositoryTask[] repositoryTasks = new DatapointRepositoryTask[repositories.length];
+        for (int k = 0; k < repositoryTasks.length; k++) {
+            DatapointRepository repository = repositories[k];
+            DatapointRepositoryTask scheduleRunnable = new DatapointRepositoryTask(repository);
+            repositoryTasks[k] = scheduleRunnable;
+            new Thread(scheduleRunnable).start();
+        }
+
         new Thread() {
+            @Override
             public void run() {
                 long sleepMs = 1000;
                 try {
                     for (; ; ) {
                         doSleep(sleepMs);
 
+                        List<Measurement> measurements = dataPointsRef.getAndSet(new Vector<Measurement>());
+
+
                         long startMs = System.currentTimeMillis();
-                        flush(startMs);
+                        ProcessCommand processCommand = new ProcessCommand();
+                        processCommand.measurements = measurements;
+                        processCommand.timeMs = startMs;
+                        for (DatapointRepositoryTask repositoryTask : repositoryTasks) {
+                            repositoryTask.measurementsQueue.add(processCommand);
+                        }
                         long endMs = System.currentTimeMillis();
                         long durationMs = endMs - startMs;
                         sleepMs = 1000 - durationMs;
@@ -85,6 +100,67 @@ public class DatapointCollector {
         }.start();
     }
 
+    private class ProcessCommand {
+        long timeMs;
+        List<Measurement> measurements;
+    }
+
+    private class DatapointRepositoryTask implements Runnable {
+        private final DatapointRepository repository;
+        private final Map<String, Aggregator> aggregators = new HashMap<String, Aggregator>();
+        private final BlockingQueue<ProcessCommand> measurementsQueue = new LinkedBlockingQueue<ProcessCommand>();
+
+        private DatapointRepositoryTask(DatapointRepository repository) {
+            this.repository = repository;
+        }
+
+        @Override
+        public void run() {
+            try {
+                for (; ; ) {
+                    ProcessCommand command = measurementsQueue.take();
+                    flush(command.measurements, command.timeMs);
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        public void flush(List<Measurement> measurements, long timeMs) {
+            if (measurements.isEmpty()) {
+                return;
+            }
+
+            for (Measurement datapoint : measurements) {
+                //Datapoint memberAgnosticDatapoint = new Datapoint(datapoint);
+                //memberAgnosticDatapoint.member="";
+
+                //Datapoint idAgnosticDatapoint = new Datapoint(datapoint);
+                //idAgnosticDatapoint.id="";
+
+                x(datapoint, timeMs);
+                //x(memberAgnosticDatapoint);
+                //x(idAgnosticDatapoint);
+            }
+
+            for (Aggregator aggregator : aggregators.values()) {
+                aggregator.aggregate(repository, timeMs);
+            }
+        }
+
+        private void x(Measurement datapoint, long timeMs) {
+            String key = id(datapoint);
+
+            Aggregator calculator = aggregators.get(key);
+            if (calculator == null) {
+                calculator = new Aggregator();
+                aggregators.put(key, calculator);
+            }
+
+            calculator.publish(datapoint, timeMs);
+        }
+    }
+
     private static void doSleep(long sleepMs) {
         try {
             Thread.sleep(sleepMs);
@@ -98,7 +174,7 @@ public class DatapointCollector {
         double maximum = Double.MIN_VALUE;
         double minimum = Double.MAX_VALUE;
         long count;
-        double total;
+        double sum;
     }
 
     class Aggregator {
@@ -134,13 +210,13 @@ public class DatapointCollector {
                 head.minimum = datapoint.value;
             }
 
-            head.total += datapoint.value;
+            head.sum += datapoint.value;
             head.count++;
         }
 
         void aggregate(DatapointRepository repository, long timeMs) {
             long rollupPeriodMs = repository.getRollupPeriodMs();
-            long maxTime = System.currentTimeMillis() - rollupPeriodMs;
+            int seconds = ((int) rollupPeriodMs / 1000) + 1;
 
             double maxvalue = Long.MIN_VALUE;
             double minvalue = Long.MAX_VALUE;
@@ -149,8 +225,11 @@ public class DatapointCollector {
 
             Node node = head;
             Node previous = null;
+            Node tail = null;
+
+            int k = 0;
             while (node != null) {
-                if (node.timestampMs < maxTime) {
+                if (k == seconds) {
                     if (timeMs - node.timestampMs > maximumRollupMs) {
                         if (previous == null) {
                             head = null;
@@ -161,6 +240,8 @@ public class DatapointCollector {
                     break;
                 }
 
+                tail = node;
+
                 if (node.maximum > maxvalue) {
                     maxvalue = node.maximum;
                 }
@@ -169,65 +250,30 @@ public class DatapointCollector {
                     minvalue = node.minimum;
                 }
 
-                items+=node.count;
-                sum += node.total;
+                items += node.count;
+                sum += node.sum;
                 previous = node;
                 node = node.next;
+                k++;
             }
 
             Datapoint result = new Datapoint(template);
             result.timestampMs = timeMs;
-
             result.metricName = template.metricName;
             result.maximum = maxvalue;
             result.minimum = minvalue;
             result.average = items == 0 ? 0 : sum / items;
+
+            long durationMs = timeMs - tail.timestampMs;
+            double difference = (head.sum / head.count) - (tail.sum / tail.count);
+            result.velocity = durationMs == 0 ? 0 : (1000 * difference) / durationMs;
+
             repository.insert(result);
         }
     }
 
-    private Map<String, Aggregator> aggregators = new HashMap<String, Aggregator>();
-
-    public void flush(long timeMs) {
-        List<Measurement> rawDatapoints = dataPointsRef.getAndSet(new Vector<Measurement>());
-        if (rawDatapoints.isEmpty()) {
-            return;
-        }
-
-        for (Measurement datapoint : rawDatapoints) {
-            //Datapoint memberAgnosticDatapoint = new Datapoint(datapoint);
-            //memberAgnosticDatapoint.member="";
-
-            //Datapoint idAgnosticDatapoint = new Datapoint(datapoint);
-            //idAgnosticDatapoint.id="";
-
-            x(datapoint,timeMs);
-            //x(memberAgnosticDatapoint);
-            //x(idAgnosticDatapoint);
-        }
-
-        for (Aggregator aggregator : aggregators.values()) {
-            for (DatapointRepository repository : repositories) {
-                aggregator.aggregate(repository, timeMs);
-            }
-        }
-    }
-
-    private void x(Measurement datapoint, long timeMs) {
-        String key = id(datapoint);
-
-        Aggregator calculator = aggregators.get(key);
-        if (calculator == null) {
-            calculator = new Aggregator();
-            aggregators.put(key, calculator);
-        }
-
-        calculator.publish(datapoint,timeMs);
-    }
 
     private String id(Measurement datapoint) {
         return datapoint.company + "!" + datapoint.cluster + "!" + datapoint.member + "!" + datapoint.id + "!" + datapoint.metricName;
     }
-
-
 }

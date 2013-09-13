@@ -8,15 +8,21 @@ TODO:
 
 - on restart, there is no history for the aggregators
 
+- a long history is potentially maintained (and looked for) in the collector; perhaps do something with granularity? So instead
+of having a linear granularity, you have e.g. an exponential one. Currently the granularity is constant at 1 second. But e.g.
+after 30 seconds it becomes 5 seconds.. with an hour it becomes a minute etc etc.
+
 - aggregate on members
 
 - aggregate on id's
 
-- velocity
-
 - check how 'latency' fits in.
 
+- clean up the placement of the measurement; currently it is race;and all contention on a single point.
+
 QUESTIONS:
+
+- the timestamp on a datapoint, is that of the management center, not that of the machine. Could this be an issue.
 
 - how to figure out which metrics are available
     - in total
@@ -27,6 +33,8 @@ QUESTIONS:
    this could be calculated based on the raw data.
 
 DONE
+
+- velocity
 
 - values are now double.
 

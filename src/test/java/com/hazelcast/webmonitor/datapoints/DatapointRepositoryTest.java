@@ -67,6 +67,7 @@ public class DatapointRepositoryTest extends AbstractRepositoryTest {
         datapoint.maximum = 500;
         datapoint.minimum = 200;
         datapoint.average = 10;
+        datapoint.velocity = 40;
         datapoint.timestampMs = System.currentTimeMillis();
         datapoint.cluster = "dev";
         datapoint.member = "192.168.1.1";
