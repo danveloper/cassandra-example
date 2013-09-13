@@ -10,9 +10,6 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
-
-//based on the incoming time they could be placed in their own bucket.
-
 public class MeasurementCollector {
 
     private final DatapointRepository[] repositories;
@@ -21,15 +18,15 @@ public class MeasurementCollector {
 
     public MeasurementCollector(Cluster cluster, Keyspace keyspace, int[] rollupPeriods, int partitionCount, Executor executor) {
         if (rollupPeriods.length == 0) {
-            throw new IllegalArgumentException();
+            throw new IllegalArgumentException("rollupPeriods.length must be larger than 0");
         }
 
         if (partitionCount < 1) {
             throw new IllegalArgumentException("partitionCount must be larger than 0");
         }
 
-        repositories = new DatapointRepository[rollupPeriods.length];
-
+        this.executor = executor;
+        this.repositories = new DatapointRepository[rollupPeriods.length];
         for (int k = 0; k < repositories.length; k++) {
             int rollupPeriodSeconds = rollupPeriods[k];
             if (rollupPeriodSeconds <= 0) {
@@ -37,21 +34,24 @@ public class MeasurementCollector {
             }
 
             int rollupPeriodMs = rollupPeriodSeconds * 1000;
-            DatapointRepository repository = new DatapointRepository(cluster, keyspace, "by_" + rollupPeriodSeconds + "_seconds", rollupPeriodMs);
+            String columnFamilyName = "by_" + rollupPeriodSeconds + "_seconds";
+            DatapointRepository repository = new DatapointRepository(cluster, keyspace, columnFamilyName, rollupPeriodMs);
             repositories[k] = repository;
         }
 
-        partitions = new Partition[partitionCount];
+        this.partitions = new Partition[partitionCount];
         for (int k = 0; k < partitionCount; k++) {
             partitions[k] = new Partition();
         }
-
-        this.executor = executor;
     }
 
-    public DatapointRepository getRepository(int rollupPeriod) {
+    public DatapointRepository getRepository(int rollupPeriodSeconds) {
+        if (rollupPeriodSeconds < 1) {
+            throw new IllegalArgumentException("rollupPeriodSecond should be larger than 0");
+        }
+
         for (DatapointRepository repo : repositories) {
-            if (repo.getRollupPeriodMs() == rollupPeriod * 1000) {
+            if (repo.getRollupPeriodMs() == rollupPeriodSeconds * 1000) {
                 return repo;
             }
         }
@@ -66,6 +66,10 @@ public class MeasurementCollector {
     }
 
     public void publish(Measurement measurement) {
+        if (measurement == null) {
+            throw new NullPointerException("Measurement can't be null");
+        }
+
         int hash = (measurement.company + measurement.cluster + measurement.metricName).hashCode();
         if (hash == Integer.MIN_VALUE) {
             hash = Integer.MAX_VALUE;
@@ -133,8 +137,8 @@ public class MeasurementCollector {
     }
 
     private static class Task {
-        long timeMs;
-        MeasurementNode head;
+        private final long timeMs;
+        private final MeasurementNode head;
 
         private Task(long timeMs, MeasurementNode head) {
             this.timeMs = timeMs;
@@ -199,8 +203,6 @@ public class MeasurementCollector {
             }
         }
     }
-
-
 
     private static void doSleep(long sleepMs) {
         try {
