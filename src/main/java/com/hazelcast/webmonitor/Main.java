@@ -1,7 +1,7 @@
 package com.hazelcast.webmonitor;
 
 import com.hazelcast.webmonitor.datapoints.Datapoint;
-import com.hazelcast.webmonitor.datapoints.DatapointCollector;
+import com.hazelcast.webmonitor.datapoints.MeasurementCollector;
 import com.hazelcast.webmonitor.datapoints.DatapointQuery;
 import me.prettyprint.cassandra.service.ThriftKsDef;
 import me.prettyprint.hector.api.Cluster;
@@ -22,7 +22,7 @@ public class Main {
     public static void main(String[] args) throws Exception {
         Cluster cluster = HFactory.getOrCreateCluster("test-cluster", "localhost:9160");
         Keyspace keyspace = createKeyspace(cluster, "Measurements");
-        DatapointCollector collector = new DatapointCollector(cluster, keyspace, new int[]{1, 5, 10});
+        MeasurementCollector collector = new MeasurementCollector(cluster, keyspace, new int[]{1, 5, 10, 30, 60});
         collector.start();
 
         long startTimeMs = System.currentTimeMillis();
@@ -58,11 +58,11 @@ public class Main {
         System.exit(0);
     }
 
-    private static void generateMeasurements(DatapointCollector collector) throws InterruptedException {
+    private static void generateMeasurements(MeasurementCollector collector) throws InterruptedException {
         long totalLatency = 0;
         long totalReadCount = 0;
-        for (int k = 0; k < 60; k++) {
-            Thread.sleep(1000);
+        for (int k = 0; k < 600; k++) {
+            Thread.sleep(100);
 
             Measurement readCount = new Measurement();
             readCount.metricName = readCountMeasurementName;

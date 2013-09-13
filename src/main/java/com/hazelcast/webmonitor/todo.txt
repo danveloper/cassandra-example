@@ -18,7 +18,11 @@ after 30 seconds it becomes 5 seconds.. with an hour it becomes a minute etc etc
 
 - check how 'latency' fits in.
 
+- behavior when no measurements appear  for existing aggregator
+
 - clean up the placement of the measurement; currently it is race;and all contention on a single point.
+    - could be done with a single linked list and a cas, this way the item is placed and will be processed
+     or someone else has placed it or the list has been cleaned; and both cases it needs to be retried.
 
 QUESTIONS:
 

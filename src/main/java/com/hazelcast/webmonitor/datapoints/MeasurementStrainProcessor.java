@@ -6,14 +6,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-class DatapointRepositoryProcessor {
+class MeasurementStrainProcessor {
     private final DatapointRepository repository;
     private final Map<String, Aggregator> aggregators = new HashMap<String, Aggregator>();
     private final int rollupPeriodMs;
     private final int historyLength;
     private final int timeMod;
 
-    DatapointRepositoryProcessor(DatapointRepository repository) {
+    MeasurementStrainProcessor(DatapointRepository repository) {
         this.repository = repository;
         this.rollupPeriodMs = repository.getRollupPeriodMs();
 
@@ -37,24 +37,26 @@ class DatapointRepositoryProcessor {
         return rollupPeriodMs;
     }
 
-    public void process(ProcessCommand command) {
-        long timeMs = timeMod * (command.getTimeMs() / timeMod);
-        flush(command.getMeasurements(), timeMs);
+    public void process(MeasurementStrain strain) {
+        long timeMs = timeMod * (strain.getTimeMs() / timeMod);
+        flush(strain.getHead(), timeMs);
     }
 
-    private void flush(List<Measurement> measurements, long timeMs) {
-        if (measurements.isEmpty()) {
+    private void flush(MeasurementNode head, long timeMs) {
+        if (head == null) {
             return;
         }
 
-        for (Measurement datapoint : measurements) {
-            //Datapoint memberAgnosticDatapoint = new Datapoint(datapoint);
+        while(head != null){
+            Measurement measurement = head.measurement;
+            head = head.next;
+            //Datapoint memberAgnosticDatapoint = new Datapoint(measurement);
             //memberAgnosticDatapoint.member="";
 
-            //Datapoint idAgnosticDatapoint = new Datapoint(datapoint);
+            //Datapoint idAgnosticDatapoint = new Datapoint(measurement);
             //idAgnosticDatapoint.id="";
 
-            publish(datapoint, timeMs);
+            publish(measurement, timeMs);
             //publish(memberAgnosticDatapoint);
             //publish(idAgnosticDatapoint);
         }
@@ -64,8 +66,8 @@ class DatapointRepositoryProcessor {
         }
     }
 
-    private void publish(Measurement datapoint, long timeMs) {
-        String key = id(datapoint);
+    private void publish(Measurement measurement, long timeMs) {
+        String key = id(measurement);
 
         Aggregator calculator = aggregators.get(key);
         if (calculator == null) {
@@ -73,11 +75,11 @@ class DatapointRepositoryProcessor {
             aggregators.put(key, calculator);
         }
 
-        calculator.publish(datapoint, timeMs);
+        calculator.publish(measurement, timeMs);
     }
 
-    private String id(Measurement datapoint) {
-        return datapoint.company + "!" + datapoint.cluster + "!" + datapoint.member + "!" + datapoint.id + "!" + datapoint.metricName;
+    private String id(Measurement m) {
+        return m.company + "!" + m.cluster + "!" + m.member + "!" + m.id + "!" + m.metricName;
     }
 
     private static class Node {
@@ -94,14 +96,14 @@ class DatapointRepositoryProcessor {
         private Datapoint template;
         private Node head;
 
-        private void publish(Measurement datapoint, long timeMs) {
+        private void publish(Measurement measurement, long timeMs) {
             if (template == null) {
                 template = new Datapoint();
-                template.metricName = datapoint.metricName;
-                template.member = datapoint.member;
-                template.cluster = datapoint.cluster;
-                template.company = datapoint.company;
-                template.id = datapoint.id;
+                template.metricName = measurement.metricName;
+                template.member = measurement.member;
+                template.cluster = measurement.cluster;
+                template.company = measurement.company;
+                template.id = measurement.id;
             }
 
             if (head == null) {
@@ -114,15 +116,15 @@ class DatapointRepositoryProcessor {
                 head = node;
             }
 
-            if (datapoint.value > head.maximum) {
-                head.maximum = datapoint.value;
+            if (measurement.value > head.maximum) {
+                head.maximum = measurement.value;
             }
 
-            if (datapoint.value < head.minimum) {
-                head.minimum = datapoint.value;
+            if (measurement.value < head.minimum) {
+                head.minimum = measurement.value;
             }
 
-            head.sum += datapoint.value;
+            head.sum += measurement.value;
             head.count++;
         }
 

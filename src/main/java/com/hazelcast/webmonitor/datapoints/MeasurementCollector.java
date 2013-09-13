@@ -13,20 +13,20 @@ import java.util.concurrent.atomic.AtomicReference;
 
 //based on the incoming time they could be placed in their own bucket.
 
-public class DatapointCollector {
+public class MeasurementCollector {
 
     private final DatapointRepository[] repositories;
-    private final AtomicReference<List<Measurement>> measurementsRef = new AtomicReference<List<Measurement>>(new Vector<Measurement>());
-    final DatapointRepositoryProcessor[] processors;
-    final BlockingQueue<ProcessCommand>[] queues;
+    private final AtomicReference<MeasurementNode> measurementsRef = new AtomicReference<MeasurementNode>();
+    private final MeasurementStrainProcessor[] processors;
+    private final BlockingQueue<MeasurementStrain>[] queues;
 
-    public DatapointCollector(Cluster cluster, Keyspace keyspace, int[] rollupPeriods) {
+    public MeasurementCollector(Cluster cluster, Keyspace keyspace, int[] rollupPeriods) {
         if (rollupPeriods.length == 0) {
             throw new IllegalArgumentException();
         }
 
         repositories = new DatapointRepository[rollupPeriods.length];
-        processors = new DatapointRepositoryProcessor[repositories.length];
+        processors = new MeasurementStrainProcessor[repositories.length];
         queues = new BlockingQueue[repositories.length];
 
         for (int k = 0; k < repositories.length; k++) {
@@ -39,10 +39,10 @@ public class DatapointCollector {
             DatapointRepository repository = new DatapointRepository(cluster, keyspace, "by_" + rollupPeriodSeconds + "_seconds", rollupPeriodMs);
             repositories[k] = repository;
 
-            final BlockingQueue<ProcessCommand> queue = new LinkedBlockingQueue<ProcessCommand>();
+            final BlockingQueue<MeasurementStrain> queue = new LinkedBlockingQueue<MeasurementStrain>();
             queues[k] = queue;
 
-            final DatapointRepositoryProcessor scheduleRunnable = new DatapointRepositoryProcessor(repository);
+            final MeasurementStrainProcessor scheduleRunnable = new MeasurementStrainProcessor(repository);
             processors[k] = scheduleRunnable;
         }
     }
@@ -58,19 +58,25 @@ public class DatapointCollector {
     }
 
     public void publish(Measurement measurement) {
-        measurementsRef.get().add(measurement);
+        for(;;){
+            MeasurementNode oldHead = measurementsRef.get();
+            MeasurementNode newHead = new MeasurementNode(oldHead,measurement);
+            if(measurementsRef.compareAndSet(oldHead, newHead)){
+                return;
+            }
+        }
     }
 
     public void start() {
         for (int k = 0; k < processors.length; k++) {
-            final BlockingQueue<ProcessCommand> queue = queues[k];
-            final DatapointRepositoryProcessor processor = processors[k];
+            final BlockingQueue<MeasurementStrain> queue = queues[k];
+            final MeasurementStrainProcessor processor = processors[k];
 
             new Thread() {
                 public void run() {
                     try {
                         for (; ; ) {
-                            ProcessCommand command = queue.take();
+                            MeasurementStrain command = queue.take();
                             processor.process(command);
                         }
                     } catch (Exception e) {
@@ -88,12 +94,12 @@ public class DatapointCollector {
                     for (; ; ) {
                         doSleep(sleepMs);
 
-                        List<Measurement> measurements = measurementsRef.getAndSet(new Vector<Measurement>());
+                        MeasurementNode head = measurementsRef.getAndSet(null);
 
                         long startMs = System.currentTimeMillis();
-                        ProcessCommand processCommand = new ProcessCommand(startMs, measurements);
+                        MeasurementStrain processCommand = new MeasurementStrain(startMs, head);
 
-                        for (BlockingQueue<ProcessCommand> queue : queues) {
+                        for (BlockingQueue<MeasurementStrain> queue : queues) {
                             queue.add(processCommand);
                         }
 
