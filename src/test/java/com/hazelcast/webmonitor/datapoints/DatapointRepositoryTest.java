@@ -21,38 +21,38 @@ public class DatapointRepositoryTest extends AbstractRepositoryTest {
 
     @Test
     public void slice() throws InterruptedException {
-        Datapoint datapoint = createDatapoint();
-        datapointRepository.insert(datapoint);
+        Datapoint p = createDatapoint();
+        datapointRepository.insert(p);
 
-        System.out.println(datapoint);
+        System.out.println(p);
 
-        List<Datapoint> result = datapointRepository.slice(datapoint.company,datapoint.cluster,null,datapoint.id,datapoint.metricName, datapoint.timestampMs - 1, datapoint.timestampMs + 1);
+        List<Datapoint> result = datapointRepository.slice(p.company,p.cluster,null,p.id,p.metricName, p.timestampMs - 1, p.timestampMs + 1);
 
         assertEquals(1, result.size());
 
-        System.out.println(datapoint);
+        System.out.println(p);
 
         System.out.println(result.get(0));
 
-        assertTrue(result.contains(datapoint));
+        assertTrue(result.contains(p));
     }
 
     @Test
     public void sliceWithMember() {
-        Datapoint datapoint1 = createDatapoint();
-        Datapoint datapoint2 = new Datapoint(datapoint1);
+        Datapoint p1 = createDatapoint();
+        Datapoint datapoint2 = new Datapoint(p1);
         datapoint2.member="192.168.1.2";
-        Datapoint datapoint3 = new Datapoint(datapoint1);
+        Datapoint datapoint3 = new Datapoint(p1);
         datapoint3.member="192.168.1.3";
 
-        datapointRepository.insert(datapoint1);
-        datapointRepository.insert(datapoint1);
-        datapointRepository.insert(datapoint1);
+        datapointRepository.insert(p1);
+        datapointRepository.insert(p1);
+        datapointRepository.insert(p1);
 
-        List<Datapoint> result = datapointRepository.slice(datapoint1.company, datapoint1.cluster, datapoint1.member, null, datapoint1.metricName, datapoint1.timestampMs - 1, datapoint1.timestampMs + 1);
+        List<Datapoint> result = datapointRepository.slice(p1.company, p1.cluster, p1.member, null, p1.metricName, p1.timestampMs - 1, p1.timestampMs + 1);
 
         assertEquals(1, result.size());
-        assertTrue(result.contains(datapoint1));
+        assertTrue(result.contains(p1));
     }
 
     public void print(List<Datapoint> datapoints){

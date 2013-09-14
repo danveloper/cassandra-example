@@ -2,8 +2,6 @@ TODO:
 
 - compression of active members, servers
 
-- no parallelisation
-
 - aggregators items are never removed.. so a potential OOME.
 
 - on restart, there is no history for the aggregators
@@ -13,16 +11,24 @@ of having a linear granularity, you have e.g. an exponential one. Currently the 
 after 30 seconds it becomes 5 seconds.. with an hour it becomes a minute etc etc.
 
 - aggregate on members
+    - this is problematic, since each member could talk to a different mancenter machine.
+    So all the information is not available on a single machine
 
 - aggregate on id's
+    - this is possible since every all data from a single member wil be available as on a single mancenter machine
 
 - check how 'latency' fits in.
+    - latency is an absolute number, but useless raw. So e.g. you take the difference in latency in a period
+      you take the difference in e.g. read count and you can do delta-latency/delta-reads.
 
 - behavior when no measurements appear  for existing aggregator
 
 - clean up the placement of the measurement; currently it is race;and all contention on a single point.
     - could be done with a single linked list and a cas, this way the item is placed and will be processed
      or someone else has placed it or the list has been cleaned; and both cases it needs to be retried.
+
+- currently all datapoint repositories have equal frequency of writing, but datapoints with higher rollingtime,
+don't need to write as frequent. This will also reduce the number of writes.
 
 QUESTIONS:
 
@@ -37,6 +43,8 @@ QUESTIONS:
    this could be calculated based on the raw data.
 
 DONE
+
+- no parallelisation
 
 - velocity
 
